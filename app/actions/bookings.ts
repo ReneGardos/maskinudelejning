@@ -15,9 +15,10 @@ async function getUserId() {
   return session.user.id
 }
 
-export async function createBooking(input: { machineName: string; machineSlug: string; startDate: string; endDate: string; customerName: string; customerEmail: string; customerPhone: string; notes?: string }) {
+export async function createBooking(input: { machineName: string; machineSlug: string; startDate: string; endDate: string; customerName: string; customerEmail: string; customerPhone: string; deliveryType: "collection" | "delivery"; deliveryAddress?: string; deliveryPostalCode?: string; notes?: string }) {
   const userId = await getUserId()
   if (!input.startDate || !input.endDate || input.endDate < input.startDate) throw new Error("Ugyldige datoer")
+  if (input.deliveryType === "delivery" && (!input.deliveryAddress || !input.deliveryPostalCode)) throw new Error("Indtast leveringsadresse og postnummer")
   const selectedMachine = await db.select({ dailyPrice: machine.dailyPrice, deposit: machine.deposit }).from(machine).where(and(eq(machine.slug, input.machineSlug), eq(machine.active, true))).limit(1)
   if (!selectedMachine[0]) throw new Error("Maskinen findes ikke længere")
   const pricing = calculateRentalPrice({ dailyPrice: selectedMachine[0].dailyPrice, deposit: selectedMachine[0].deposit, startDate: input.startDate, endDate: input.endDate })
