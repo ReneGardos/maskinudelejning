@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { booking, bookingEvent, machine } from "@/lib/db/schema"
+import { booking, bookingEvent, inspectionReport, machine } from "@/lib/db/schema"
 import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { randomUUID } from "crypto"
@@ -42,6 +42,15 @@ export async function getBookingEvents(bookingId: string) {
   const owned = await db.select({ id: booking.id }).from(booking).where(and(eq(booking.id, bookingId), eq(booking.userId, userId))).limit(1)
   if (!owned.length) throw new Error("Unauthorized")
   return db.select().from(bookingEvent).where(eq(bookingEvent.bookingId, bookingId)).orderBy(desc(bookingEvent.createdAt))
+}
+
+export async function saveInspectionReport(input: { bookingId: string; phase: "handover" | "return"; checklist: string[]; notes?: string; photos?: string[] }) {
+  const userId = await getUserId()
+  const id = randomUUID()
+  await db.insert(inspectionReport).values({ id, bookingId: input.bookingId, phase: input.phase, checklist: input.checklist, notes: input.notes || "", photos: input.photos || [], createdBy: userId })
+  await db.insert(bookingEvent).values({ id: randomUUID(), bookingId: input.bookingId, type: `inspection_${input.phase}`, message: `${input.phase === "handover" ? "Udlevering" : "Retur"} registreret`, createdBy: userId })
+  revalidatePath("/admin")
+  return { ok: true, id }
 }
 
 export async function getAdminBookings() {
