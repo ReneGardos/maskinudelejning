@@ -2,11 +2,11 @@
 
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { accessory, booking, bookingEvent, bookingItem, favoriteMachine, inspectionReport, machine, maintenanceEvent, rentalReturn } from "@/lib/db/schema"
+import { accessory, booking, bookingEvent, bookingItem, deliveryZone, favoriteMachine, inspectionReport, machine, maintenanceEvent, rentalReturn } from "@/lib/db/schema"
 import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { randomUUID } from "crypto"
-import { and, desc, eq, gt, inArray, lt, ne } from "drizzle-orm"
+import { and, desc, eq, gt, ilike, inArray, lt, ne, or } from "drizzle-orm"
 import { calculateRentalPrice } from "@/lib/pricing"
 
 async function getUserId() {
@@ -21,9 +21,10 @@ export async function createBooking(input: { machineName: string; machineSlug: s
   if (input.deliveryType === "delivery" && (!input.deliveryAddress || !input.deliveryPostalCode)) throw new Error("Indtast leveringsadresse og postnummer")
   const selectedMachine = await db.select({ id: machine.id, dailyPrice: machine.dailyPrice, deposit: machine.deposit }).from(machine).where(and(eq(machine.slug, input.machineSlug), eq(machine.active, true))).limit(1)
   if (!selectedMachine[0]) throw new Error("Maskinen findes ikke længere")
+  const selectedZone = input.deliveryType === "delivery" && input.deliveryPostalCode ? await db.select({ deliveryFee: deliveryZone.deliveryFee }).from(deliveryZone).where(or(eq(deliveryZone.postalCodes, "*"), ilike(deliveryZone.postalCodes, `%${input.deliveryPostalCode}%`))).limit(1) : []
   const selectedAccessories = input.accessoryIds?.length ? await db.select({ id: accessory.id, name: accessory.name, dailyPrice: accessory.dailyPrice }).from(accessory).where(and(inArray(accessory.id, input.accessoryIds), eq(accessory.machineId, selectedMachine[0].id), eq(accessory.active, true))) : []
   if (input.accessoryIds?.length && selectedAccessories.length !== input.accessoryIds.length) throw new Error("Ugyldigt tilbehør")
-  const pricing = calculateRentalPrice({ dailyPrice: selectedMachine[0].dailyPrice, deposit: selectedMachine[0].deposit, startDate: input.startDate, endDate: input.endDate, accessoryTotal: selectedAccessories.reduce((sum, item) => sum + item.dailyPrice, 0) })
+  const pricing = calculateRentalPrice({ dailyPrice: selectedMachine[0].dailyPrice, deposit: selectedMachine[0].deposit, startDate: input.startDate, endDate: input.endDate, deliveryFee: selectedZone[0]?.deliveryFee || 0, accessoryTotal: selectedAccessories.reduce((sum, item) => sum + item.dailyPrice, 0) })
   const conflicts = await db.select({ id: booking.id }).from(booking).where(and(eq(booking.machineSlug, input.machineSlug), ne(booking.status, "cancelled"), lt(booking.startDate, input.endDate), gt(booking.endDate, input.startDate))).limit(1)
   if (conflicts.length) throw new Error("Maskinen er allerede booket i den periode")
   const bookingId = randomUUID()
