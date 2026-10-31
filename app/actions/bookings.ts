@@ -7,6 +7,7 @@ import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { randomUUID } from "crypto"
 import { and, desc, eq, gt, lt, ne } from "drizzle-orm"
+import { calculateRentalPrice } from "@/lib/pricing"
 
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -17,12 +18,12 @@ async function getUserId() {
 export async function createBooking(input: { machineName: string; machineSlug: string; startDate: string; endDate: string; customerName: string; customerEmail: string; customerPhone: string; notes?: string }) {
   const userId = await getUserId()
   if (!input.startDate || !input.endDate || input.endDate < input.startDate) throw new Error("Ugyldige datoer")
-  const selectedMachine = await db.select({ dailyPrice: machine.dailyPrice }).from(machine).where(and(eq(machine.slug, input.machineSlug), eq(machine.active, true))).limit(1)
+  const selectedMachine = await db.select({ dailyPrice: machine.dailyPrice, deposit: machine.deposit }).from(machine).where(and(eq(machine.slug, input.machineSlug), eq(machine.active, true))).limit(1)
   if (!selectedMachine[0]) throw new Error("Maskinen findes ikke længere")
-  const start = new Date(`${input.startDate}T00:00:00Z`).getTime(); const end = new Date(`${input.endDate}T00:00:00Z`).getTime(); const days = Math.max(1, Math.ceil((end - start) / 86400000) + 1)
+  const pricing = calculateRentalPrice({ dailyPrice: selectedMachine[0].dailyPrice, deposit: selectedMachine[0].deposit, startDate: input.startDate, endDate: input.endDate })
   const conflicts = await db.select({ id: booking.id }).from(booking).where(and(eq(booking.machineSlug, input.machineSlug), ne(booking.status, "cancelled"), lt(booking.startDate, input.endDate), gt(booking.endDate, input.startDate))).limit(1)
   if (conflicts.length) throw new Error("Maskinen er allerede booket i den periode")
-  await db.insert(booking).values({ id: randomUUID(), userId, ...input, notes: input.notes || null, total: days * selectedMachine[0].dailyPrice, status: "pending" })
+  await db.insert(booking).values({ id: randomUUID(), userId, ...input, notes: input.notes || null, total: pricing.total, status: "pending" })
   revalidatePath("/min-konto")
   revalidatePath("/admin")
   return { ok: true }
