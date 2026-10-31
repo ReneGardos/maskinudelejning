@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { accessory, booking, bookingEvent, bookingItem, inspectionReport, machine, maintenanceEvent, rentalReturn } from "@/lib/db/schema"
+import { accessory, booking, bookingEvent, bookingItem, favoriteMachine, inspectionReport, machine, maintenanceEvent, rentalReturn } from "@/lib/db/schema"
 import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { randomUUID } from "crypto"
@@ -34,6 +34,10 @@ export async function createBooking(input: { machineName: string; machineSlug: s
   revalidatePath("/admin")
   return { ok: true }
 }
+
+export async function toggleFavoriteMachine(machineId: string) { const userId = await getUserId(); const existing = await db.select({ id: favoriteMachine.id }).from(favoriteMachine).where(and(eq(favoriteMachine.userId, userId), eq(favoriteMachine.machineId, machineId))).limit(1); if (existing[0]) await db.delete(favoriteMachine).where(eq(favoriteMachine.id, existing[0].id)); else await db.insert(favoriteMachine).values({ id: randomUUID(), userId, machineId }); revalidatePath("/min-konto"); return { saved: !existing[0] } }
+
+export async function getFavoriteMachines() { const userId = await getUserId(); return db.select({ id: favoriteMachine.id, machineId: favoriteMachine.machineId, name: machine.name, slug: machine.slug, image: machine.image, dailyPrice: machine.dailyPrice }).from(favoriteMachine).innerJoin(machine, eq(machine.id, favoriteMachine.machineId)).where(eq(favoriteMachine.userId, userId)) }
 
 export async function getMyBookings() {
   const userId = await getUserId()
