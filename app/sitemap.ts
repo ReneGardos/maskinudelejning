@@ -1,0 +1,3 @@
+import type { MetadataRoute } from "next"
+
+export default function sitemap(): MetadataRoute.Sitemap { const base = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"; return [{ url: base, changeFrequency: "weekly", priority: 1 }, { url: `${base}/maskiner`, changeFrequency: "daily", priority: 0.9 }, { url: `${base}/booking`, changeFrequency: "weekly", priority: 0.8 }, { url: `${base}/find-maskine`, changeFrequency: "weekly", priority: 0.8 }, { url: `${base}/om-os`, changeFrequency: "monthly", priority: 0.5 }, { url: `${base}/handelsbetingelser`, changeFrequency: "yearly", priority: 0.3 }, { url: `${base}/privatlivspolitik`, changeFrequency: "yearly", priority: 0.3 }] }
