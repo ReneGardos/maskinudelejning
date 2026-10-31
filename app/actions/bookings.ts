@@ -15,10 +15,11 @@ async function getUserId() {
   return session.user.id
 }
 
-export async function createBooking(input: { machineName: string; machineSlug: string; startDate: string; endDate: string; customerName: string; customerEmail: string; customerPhone: string; deliveryType: "collection" | "delivery"; deliveryAddress?: string; deliveryPostalCode?: string; accessoryIds?: string[]; notes?: string }) {
+export async function createBooking(input: { machineName: string; machineSlug: string; startDate: string; endDate: string; customerName: string; customerEmail: string; customerPhone: string; deliveryType: "collection" | "delivery"; deliveryAddress?: string; deliveryPostalCode?: string; accessoryIds?: string[]; acceptTerms: boolean; notes?: string }) {
   const userId = await getUserId()
   if (!input.startDate || !input.endDate || input.endDate < input.startDate) throw new Error("Ugyldige datoer")
   if (input.deliveryType === "delivery" && (!input.deliveryAddress || !input.deliveryPostalCode)) throw new Error("Indtast leveringsadresse og postnummer")
+  if (!input.acceptTerms) throw new Error("Du skal acceptere handelsbetingelserne")
   const selectedMachine = await db.select({ id: machine.id, dailyPrice: machine.dailyPrice, deposit: machine.deposit }).from(machine).where(and(eq(machine.slug, input.machineSlug), eq(machine.active, true))).limit(1)
   if (!selectedMachine[0]) throw new Error("Maskinen findes ikke længere")
   const selectedZone = input.deliveryType === "delivery" && input.deliveryPostalCode ? await db.select({ deliveryFee: deliveryZone.deliveryFee }).from(deliveryZone).where(or(eq(deliveryZone.postalCodes, "*"), ilike(deliveryZone.postalCodes, `%${input.deliveryPostalCode}%`))).limit(1) : []
