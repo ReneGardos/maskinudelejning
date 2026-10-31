@@ -6,7 +6,7 @@ import { booking } from "@/lib/db/schema"
 import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { randomUUID } from "crypto"
-import { desc, eq } from "drizzle-orm"
+import { and, desc, eq, gt, lt, ne } from "drizzle-orm"
 
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -17,6 +17,8 @@ async function getUserId() {
 export async function createBooking(input: { machineName: string; machineSlug: string; startDate: string; endDate: string; customerName: string; customerEmail: string; customerPhone: string; notes?: string }) {
   const userId = await getUserId()
   if (!input.startDate || !input.endDate || input.endDate < input.startDate) throw new Error("Ugyldige datoer")
+  const conflicts = await db.select({ id: booking.id }).from(booking).where(and(eq(booking.machineSlug, input.machineSlug), ne(booking.status, "cancelled"), lt(booking.startDate, input.endDate), gt(booking.endDate, input.startDate))).limit(1)
+  if (conflicts.length) throw new Error("Maskinen er allerede booket i den periode")
   await db.insert(booking).values({ id: randomUUID(), userId, ...input, notes: input.notes || null, total: 0, status: "pending" })
   revalidatePath("/min-konto")
   revalidatePath("/admin")
