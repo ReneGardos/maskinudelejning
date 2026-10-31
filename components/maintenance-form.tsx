@@ -1,0 +1,6 @@
+"use client"
+
+import { useState } from "react"
+import { createMaintenanceEvent } from "@/app/actions/bookings"
+
+export function MaintenanceForm({ machines }: { machines: { id: string; name: string }[] }) { const [message, setMessage] = useState(""); async function submit(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); await createMaintenanceEvent({ machineId: String(form.get("machineId")), type: String(form.get("type")), notes: String(form.get("notes") || ""), cost: Number(form.get("cost") || 0), scheduledFor: String(form.get("scheduledFor") || "") }); setMessage("Vedligeholdelse gemt"); event.currentTarget.reset() } return <form className="maintenance-form" onSubmit={submit}><label>Maskine<select name="machineId" required>{machines.map((machine) => <option key={machine.id} value={machine.id}>{machine.name}</option>)}</select></label><label>Type<select name="type"><option>Service</option><option>Reparation</option><option>Rengøring</option></select></label><label>Planlagt dato<input name="scheduledFor" type="date" /></label><label>Pris<input name="cost" type="number" min="0" /></label><label>Noter<textarea name="notes" rows={3} /></label><button className="button button-dark" type="submit">Gem vedligeholdelse</button>{message && <small>{message}</small>}</form> }

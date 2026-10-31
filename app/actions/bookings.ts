@@ -2,11 +2,11 @@
 
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { booking, bookingEvent, inspectionReport, machine } from "@/lib/db/schema"
+import { accessory, booking, bookingEvent, bookingItem, inspectionReport, machine, maintenanceEvent, rentalReturn } from "@/lib/db/schema"
 import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { randomUUID } from "crypto"
-import { and, desc, eq, gt, lt, ne } from "drizzle-orm"
+import { and, desc, eq, gt, inArray, lt, ne } from "drizzle-orm"
 import { calculateRentalPrice } from "@/lib/pricing"
 
 async function getUserId() {
@@ -15,17 +15,20 @@ async function getUserId() {
   return session.user.id
 }
 
-export async function createBooking(input: { machineName: string; machineSlug: string; startDate: string; endDate: string; customerName: string; customerEmail: string; customerPhone: string; deliveryType: "collection" | "delivery"; deliveryAddress?: string; deliveryPostalCode?: string; notes?: string }) {
+export async function createBooking(input: { machineName: string; machineSlug: string; startDate: string; endDate: string; customerName: string; customerEmail: string; customerPhone: string; deliveryType: "collection" | "delivery"; deliveryAddress?: string; deliveryPostalCode?: string; accessoryIds?: string[]; notes?: string }) {
   const userId = await getUserId()
   if (!input.startDate || !input.endDate || input.endDate < input.startDate) throw new Error("Ugyldige datoer")
   if (input.deliveryType === "delivery" && (!input.deliveryAddress || !input.deliveryPostalCode)) throw new Error("Indtast leveringsadresse og postnummer")
-  const selectedMachine = await db.select({ dailyPrice: machine.dailyPrice, deposit: machine.deposit }).from(machine).where(and(eq(machine.slug, input.machineSlug), eq(machine.active, true))).limit(1)
+  const selectedMachine = await db.select({ id: machine.id, dailyPrice: machine.dailyPrice, deposit: machine.deposit }).from(machine).where(and(eq(machine.slug, input.machineSlug), eq(machine.active, true))).limit(1)
   if (!selectedMachine[0]) throw new Error("Maskinen findes ikke længere")
-  const pricing = calculateRentalPrice({ dailyPrice: selectedMachine[0].dailyPrice, deposit: selectedMachine[0].deposit, startDate: input.startDate, endDate: input.endDate })
+  const selectedAccessories = input.accessoryIds?.length ? await db.select({ id: accessory.id, name: accessory.name, dailyPrice: accessory.dailyPrice }).from(accessory).where(and(inArray(accessory.id, input.accessoryIds), eq(accessory.machineId, selectedMachine[0].id), eq(accessory.active, true))) : []
+  if (input.accessoryIds?.length && selectedAccessories.length !== input.accessoryIds.length) throw new Error("Ugyldigt tilbehør")
+  const pricing = calculateRentalPrice({ dailyPrice: selectedMachine[0].dailyPrice, deposit: selectedMachine[0].deposit, startDate: input.startDate, endDate: input.endDate, accessoryTotal: selectedAccessories.reduce((sum, item) => sum + item.dailyPrice, 0) })
   const conflicts = await db.select({ id: booking.id }).from(booking).where(and(eq(booking.machineSlug, input.machineSlug), ne(booking.status, "cancelled"), lt(booking.startDate, input.endDate), gt(booking.endDate, input.startDate))).limit(1)
   if (conflicts.length) throw new Error("Maskinen er allerede booket i den periode")
   const bookingId = randomUUID()
-  await db.insert(booking).values({ id: bookingId, userId, ...input, notes: input.notes || null, total: pricing.total, status: "pending" })
+  await db.insert(booking).values({ id: bookingId, userId, machineName: input.machineName, machineSlug: input.machineSlug, startDate: input.startDate, endDate: input.endDate, customerName: input.customerName, customerEmail: input.customerEmail, customerPhone: input.customerPhone, deliveryType: input.deliveryType, deliveryAddress: input.deliveryAddress || null, deliveryPostalCode: input.deliveryPostalCode || null, notes: input.notes || null, total: pricing.total, status: "pending" })
+  if (selectedAccessories.length) await db.insert(bookingItem).values(selectedAccessories.map((item) => ({ id: randomUUID(), bookingId, accessoryId: item.id, name: item.name, quantity: 1, unitPrice: item.dailyPrice })))
   await db.insert(bookingEvent).values({ id: randomUUID(), bookingId, type: "created", message: "Bookingforespørgsel oprettet", createdBy: userId })
   revalidatePath("/min-konto")
   revalidatePath("/admin")
@@ -52,6 +55,10 @@ export async function saveInspectionReport(input: { bookingId: string; phase: "h
   revalidatePath("/admin")
   return { ok: true, id }
 }
+
+export async function createMaintenanceEvent(input: { machineId: string; type: string; notes?: string; cost?: number; scheduledFor?: string }) { const userId = await getUserId(); await db.insert(maintenanceEvent).values({ id: randomUUID(), machineId: input.machineId, type: input.type, notes: input.notes || "", cost: input.cost || 0, scheduledFor: input.scheduledFor || null, createdBy: userId }); revalidatePath("/admin"); return { ok: true } }
+
+export async function recordRentalReturn(input: { bookingId: string; condition: string; damageNotes?: string; extraCharge?: number }) { const userId = await getUserId(); await db.insert(rentalReturn).values({ id: randomUUID(), bookingId: input.bookingId, condition: input.condition, damageNotes: input.damageNotes || "", extraCharge: input.extraCharge || 0, createdBy: userId }); await db.update(booking).set({ status: "completed", updatedAt: new Date() }).where(eq(booking.id, input.bookingId)); revalidatePath("/admin"); return { ok: true } }
 
 export async function getAdminBookings() {
   await getUserId()

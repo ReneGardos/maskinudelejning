@@ -1,0 +1,6 @@
+"use client"
+
+import { useState } from "react"
+import { recordRentalReturn } from "@/app/actions/bookings"
+
+export function ReturnForm({ bookingId }: { bookingId: string }) { const [open, setOpen] = useState(false); const [saved, setSaved] = useState(false); async function submit(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); await recordRentalReturn({ bookingId, condition: String(form.get("condition")), damageNotes: String(form.get("damageNotes") || ""), extraCharge: Number(form.get("extraCharge") || 0) }); setSaved(true); setOpen(false) } return <div className="return-control">{open ? <form onSubmit={submit} className="return-form"><select name="condition" defaultValue="good"><option value="good">God stand</option><option value="damage">Skader registreret</option><option value="missing">Mangler dele</option></select><textarea name="damageNotes" placeholder="Noter om retur" rows={2}/><input name="extraCharge" type="number" min="0" placeholder="Ekstra opkrævning (kr.)"/><button className="button button-dark" type="submit">Registrér retur</button></form> : <button type="button" className="inspection-trigger" onClick={() => setOpen(true)}>Registrér retur</button>}{saved && <small>Retur gemt</small>}</div> }
