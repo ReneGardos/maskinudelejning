@@ -1,12 +1,12 @@
-"use client"
+import { notFound } from "next/navigation"
+import { eq } from "drizzle-orm"
+import { db } from "@/lib/db"
+import { machine } from "@/lib/db/schema"
+import MachineBookingPage from "@/components/machine-booking-client"
 
-import { FormEvent, useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { createBooking } from "@/app/actions/bookings"
-
-export default function MachineBookingPage() {
-  const router = useRouter(); const [message, setMessage] = useState(""); const [pending, setPending] = useState(false)
-  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setPending(true); setMessage(""); const form = new FormData(event.currentTarget); try { await createBooking({ machineName: "90 kg pladevibrator", machineSlug: "90kg-pladevibrator", startDate: String(form.get("startDate")), endDate: String(form.get("endDate")), customerName: String(form.get("customerName")), customerEmail: String(form.get("customerEmail")), customerPhone: String(form.get("customerPhone")), deliveryType: String(form.get("deliveryType") || "collection") as "collection" | "delivery", deliveryAddress: String(form.get("deliveryAddress") || ""), deliveryPostalCode: String(form.get("deliveryPostalCode") || ""), notes: String(form.get("notes") || "") }); setMessage("Din forespørgsel er sendt. Vi vender tilbage med en bekræftelse."); event.currentTarget.reset() } catch (error) { const text = error instanceof Error ? error.message : "Der opstod en fejl"; if (text === "Unauthorized") router.push("/sign-in"); else setMessage(text) } finally { setPending(false) } }
-  return <main className="booking-page"><Link href="/maskiner" className="back-link">← Tilbage til maskiner</Link><div className="booking-layout"><section className="booking-intro"><p className="eyebrow">Komprimering · ID 1042</p><h1>90 kg pladevibrator</h1><p className="lead">Stærk og kompakt maskine til belægning, indkørsler og mindre anlægsarbejde.</p><div className="machine-specs"><span><strong>90 kg</strong> vægt</span><span><strong>45 cm</strong> arbejdsbredde</span><span><strong>250 kr.</strong> pr. dag</span></div><img src="/maskiner-hero.png" alt="Pladevibrator og minigraver på byggeplads" /></section><section className="booking-card"><p className="eyebrow">Forespørgsel</p><h2>Book maskinen</h2><p className="muted">Udfyld formularen, så vender vi tilbage med endelig bekræftelse.</p><form className="booking-form" onSubmit={submit}><div className="form-row"><label>Fra<input name="startDate" type="date" required /></label><label>Til<input name="endDate" type="date" required /></label></div><label>Navn<input name="customerName" required /></label><label>Email<input name="customerEmail" type="email" required /></label><label>Telefon<input name="customerPhone" type="tel" required /></label><label>Levering eller afhentning<select name="deliveryType" defaultValue="collection"><option value="collection">Jeg afhenter selv</option><option value="delivery">Lever på adressen</option></select></label><div className="form-row"><label>Adresse<input name="deliveryAddress" placeholder="Valgfrit ved afhentning" /></label><label>Postnummer<input name="deliveryPostalCode" inputMode="numeric" placeholder="Fx 8000" /></label></div><label>Besked <span className="muted">(valgfrit)</span><textarea name="notes" rows={3} /></label>{message && <p className="success-message">{message}</p>}<button className="button button-dark" disabled={pending}>{pending ? "Sender forespørgsel…" : "Send bookingforespørgsel"}</button></form></section></div></main>
+export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const result = await db.select({ name: machine.name, slug: machine.slug, category: machine.category, description: machine.description, dailyPrice: machine.dailyPrice, image: machine.image, specifications: machine.specifications, active: machine.active }).from(machine).where(eq(machine.slug, slug)).limit(1)
+  if (!result[0] || !result[0].active) notFound()
+  return <MachineBookingPage machine={result[0]} />
 }
