@@ -17,6 +17,7 @@
 .hero-number{position:absolute;z-index:2}
 .mobile-menu{display:none}
 @media(max-width:900px) and (min-width:701px){.nav-links{gap:14px}.nav-actions .account-link{display:none}.nav-inner{gap:16px}.container{width:min(100% - 32px,1180px)}.hero-content{width:min(100% - 32px,1180px)}}
+.hero{position:relative;min-height:620px;overflow:hidden;background:#18221f}.hero-image{position:absolute;inset:0;z-index:0;height:100%;min-height:620px;background-size:cover;background-position:center}.hero::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(15,25,22,.88),rgba(15,25,22,.48) 50%,rgba(15,25,22,.22))}.hero-content{position:relative;z-index:2;min-height:620px;color:#fff;display:flex;flex-direction:column;justify-content:center;padding:120px 48px 170px}.hero-content h1,.hero-content p,.hero-content .eyebrow,.hero-content .trust-row{position:relative;z-index:3}.hero-number{position:relative;z-index:3;color:rgba(255,255,255,.8)}
 @media(max-width:700px){.nav-links{display:none}.mobile-menu{display:grid;place-items:center;background:#fff;border:1px solid var(--line);width:42px;height:42px}.nav-actions .button{display:none}.topbar-muted{display:none}.topbar-inner{justify-content:space-between}.hero-content{padding:72px 0 116px}.hero{min-height:520px}.hero h1{font-size:clamp(42px,12vw,62px)}.hero-number{right:16px}.booking-wrap{margin-top:-42px}.category-grid{grid-template-columns:repeat(2,1fr)}.category-visual{height:100px}}
 
 
