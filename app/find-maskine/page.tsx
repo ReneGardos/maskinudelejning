@@ -1,0 +1,6 @@
+import Link from "next/link"
+import { ArrowRight } from "lucide-react"
+
+const projects = [{ slug: "minigraver-18t", title: "Grave ud til terrasse", text: "Udgravning, dræn og mindre jordarbejde." }, { slug: "90kg-pladevibrator", title: "Komprimere jord og grus", text: "Klargør underlag til terrasse, indkørsel eller belægning." }, { slug: "dumper-1t", title: "Flytte jord", text: "Flyt jord, sand og byggeaffald på pladsen." }]
+
+export default function FindMachinePage() { return <main className="site-shell"><header className="navbar"><div className="container nav-inner"><Link href="/" className="brand"><span className="brand-mark">M</span><span>maskin<span>udlejning</span><small>MASKINER TIL DINE PROJEKTER</small></span></Link><Link href="/maskiner" className="button button-light">Se alle maskiner</Link></div></header><section className="section project-finder-page"><div className="container narrow"><p className="eyebrow orange">PROJEKTFINDER</p><h1>Hvad skal du have lavet?</h1><p className="lead">Vælg dit projekt, så viser vi en maskine, der passer til opgaven.</p><div className="project-page-grid">{projects.map((project) => <Link href={`/maskiner/${project.slug}`} className="project-page-card" key={project.slug}><span><strong>{project.title}</strong><small>{project.text}</small></span><ArrowRight size={20}/></Link>)}</div></div></section></main> }
