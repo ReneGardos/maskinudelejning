@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowRight, CalendarDays, ChevronDown, CircleCheck, Clock3, Filter, Menu, PackageCheck, Search, ShieldCheck, Truck, UserRound, X } from 'lucide-react'
 
 const machines = [
@@ -14,14 +15,23 @@ const categories = ['Minigravere', 'Pladevibratorer', 'Beton & blanding', 'Nedbr
 const projects = ['Grave ud til terrasse', 'Komprimere jord og grus', 'Nedbryde beton', 'Flytte jord']
 
 export default function Home() {
+  const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const [project, setProject] = useState('')
   const [search, setSearch] = useState('')
-  const [submitted, setSubmitted] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [postcode, setPostcode] = useState('7400')
   const [filterOpen, setFilterOpen] = useState(false)
+
+  // Sender datoer og søgeord videre til kataloget, som viser de maskiner, der faktisk er ledige.
+  function findMachines() {
+    const params = new URLSearchParams()
+    if (search.trim()) params.set('q', search.trim())
+    if (startDate && endDate && endDate >= startDate) { params.set('start', startDate); params.set('end', endDate) }
+    const query = params.toString()
+    router.push(query ? `/maskiner?${query}` : '/maskiner')
+  }
 
   return (
     <main className="site-shell">
@@ -30,7 +40,7 @@ export default function Home() {
 
       <section className="hero"><div className="hero-image" /><div className="hero-overlay" /><div className="container hero-content"><div className="eyebrow light"><span className="eyebrow-line" /> MASKINUDLEJNING I MIDTJYLLAND</div><h1>Lej den rigtige maskine.<br /><em>Kom hurtigere i mål.</em></h1><p>Professionelt materiel, enkel booking og levering lige til døren. Til både private projekter og professionelle opgaver.</p><div className="trust-row"><span><CircleCheck size={16} /> Klar pris fra start</span><span><CircleCheck size={16} /> Fleksibel afhentning</span><span><CircleCheck size={16} /> Lokalt team</span></div></div><div className="hero-number">01 <span>/ 03</span></div></section>
 
-      <section className="booking-wrap" id="booking"><div className="container"><div className="booking-card"><div className="booking-heading"><span className="step-number">01</span><div><p className="eyebrow">HURTIG BOOKING</p><h2>Hvad skal du bruge?</h2></div></div><div className="booking-fields"><label className="search-field"><span>Maskine eller opgave</span><div><Search size={18} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Fx pladevibrator eller terrasse" /></div></label><label><span>Startdato</span><div className="input-like"><CalendarDays size={18} /><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} aria-label="Startdato" /></div></label><label><span>Slutdato</span><div className="input-like"><CalendarDays size={18} /><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} aria-label="Slutdato" /></div></label><label><span>Postnummer</span><div className="input-like"><span className="pin">⌖</span><input value={postcode} onChange={(e) => setPostcode(e.target.value)} inputMode="numeric" placeholder="7400" aria-label="Postnummer" /></div></label><button className="button button-orange" onClick={() => setSubmitted(true)}>Find ledige maskiner <ArrowRight size={17} /></button></div>{submitted && <div className="booking-success"><CircleCheck size={18} /> Vi har fundet 12 maskiner, der passer til din søgning. <Link href="#maskiner">Se maskiner</Link></div>}</div></div></section>
+      <section className="booking-wrap" id="booking"><div className="container"><div className="booking-card"><div className="booking-heading"><span className="step-number">01</span><div><p className="eyebrow">HURTIG BOOKING</p><h2>Hvad skal du bruge?</h2></div></div><div className="booking-fields"><label className="search-field"><span>Maskine eller opgave</span><div><Search size={18} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Fx pladevibrator eller terrasse" /></div></label><label><span>Startdato</span><div className="input-like"><CalendarDays size={18} /><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} aria-label="Startdato" /></div></label><label><span>Slutdato</span><div className="input-like"><CalendarDays size={18} /><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} aria-label="Slutdato" /></div></label><label><span>Postnummer</span><div className="input-like"><span className="pin">⌖</span><input value={postcode} onChange={(e) => setPostcode(e.target.value)} inputMode="numeric" placeholder="7400" aria-label="Postnummer" /></div></label><button className="button button-orange" onClick={findMachines}>Find ledige maskiner <ArrowRight size={17} /></button></div></div></div></section>
 
       <section className="section categories"><div className="container"><div className="section-head"><div><p className="eyebrow">ALT TIL DIT PROJEKT</p><h2>Find det rigtige materiel</h2></div><Link href="/maskiner" className="text-link">Se alle maskiner <ArrowRight size={16} /></Link></div><div className="category-grid">{categories.map((cat, i) => <Link href="/maskiner" className="category-card" key={cat}><div className={`category-visual visual-${i + 1}`}><span>0{i + 1}</span></div><div className="category-name">{cat}<ArrowRight size={17} /></div></Link>)}</div></div></section>
 

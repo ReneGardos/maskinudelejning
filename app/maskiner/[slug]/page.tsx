@@ -4,14 +4,20 @@ import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { machine } from "@/lib/db/schema"
 import { getSessionUser } from "@/lib/session"
-import { todayInDenmark } from "@/lib/booking-rules"
+import { getBookedRanges } from "@/lib/availability"
+import { isValidDateString, todayInDenmark } from "@/lib/booking-rules"
 import { BookingForm } from "@/components/booking-form"
 
-export default async function MachineBookingPage({ params }: { params: Promise<{ slug: string }> }) {
+type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ start?: string; end?: string }> }
+
+export default async function MachineBookingPage({ params, searchParams }: Props) {
   const { slug } = await params
+  const { start, end } = await searchParams
   const [item] = await db.select().from(machine).where(and(eq(machine.slug, slug), eq(machine.active, true))).limit(1)
   if (!item) notFound()
-  const user = await getSessionUser()
+  const [user, bookedRanges] = await Promise.all([getSessionUser(), getBookedRanges(item.slug)])
+  const today = todayInDenmark()
+  const validPeriod = start && end && isValidDateString(start) && isValidDateString(end) && end >= start && start >= today
 
   return (
     <main className="booking-page">
@@ -30,7 +36,10 @@ export default async function MachineBookingPage({ params }: { params: Promise<{
           <p className="muted">Udfyld formularen, så vender vi tilbage med endelig bekræftelse.</p>
           <BookingForm
             machine={{ slug: item.slug, name: item.name, dailyPrice: item.dailyPrice }}
-            today={todayInDenmark()}
+            today={today}
+            bookedRanges={bookedRanges}
+            initialStart={validPeriod ? start : ""}
+            initialEnd={validPeriod ? end : ""}
             loggedIn={Boolean(user)}
             defaultName={user?.name ?? ""}
             defaultEmail={user?.email ?? ""}

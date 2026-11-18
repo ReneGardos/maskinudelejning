@@ -24,6 +24,19 @@ export function rentalDays(startDate: string, endDate: string) {
   return Math.round((end - start) / 86400000) + 1
 }
 
+export const DELIVERY_METHODS = ["pickup", "delivery"] as const
+export type DeliveryMethod = (typeof DELIVERY_METHODS)[number]
+
+/** Kunden kan selv annullere, indtil dagen før lejeperioden starter. */
+export function canCancelBooking(startDate: string, status: string) {
+  return (status === "pending" || status === "confirmed") && startDate > todayInDenmark()
+}
+
+/** Overlapper to perioder? Begge ender er inklusive. */
+export function rangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
+  return aStart <= bEnd && aEnd >= bStart
+}
+
 export type BookingInput = {
   machineSlug: string
   startDate: string
@@ -32,6 +45,9 @@ export type BookingInput = {
   customerEmail: string
   customerPhone: string
   notes: string | null
+  deliveryMethod: DeliveryMethod
+  deliveryAddress: string | null
+  deliveryPostcode: string | null
 }
 
 /** Rensér og valider input fra klienten. Kaster en dansk fejlbesked ved ugyldigt input. */
@@ -47,7 +63,15 @@ export function parseBookingInput(raw: unknown): BookingInput {
   const customerEmail = text("customerEmail").toLowerCase()
   const customerPhone = text("customerPhone")
   const notes = text("notes")
+  const deliveryMethod = text("deliveryMethod") || "pickup"
+  const deliveryAddress = text("deliveryAddress")
+  const deliveryPostcode = text("deliveryPostcode")
 
+  if (!(DELIVERY_METHODS as readonly string[]).includes(deliveryMethod)) throw new Error("Vælg levering eller afhentning")
+  if (deliveryMethod === "delivery") {
+    if (deliveryAddress.length < 3 || deliveryAddress.length > 200) throw new Error("Indtast leveringsadressen")
+    if (!/^\d{4}$/.test(deliveryPostcode)) throw new Error("Indtast et gyldigt postnummer (4 cifre)")
+  }
   if (!machineSlug || machineSlug.length > 100) throw new Error("Ugyldig maskine")
   if (!isValidDateString(startDate) || !isValidDateString(endDate)) throw new Error("Ugyldige datoer")
   if (endDate < startDate) throw new Error("Slutdatoen kan ikke være før startdatoen")
@@ -59,5 +83,11 @@ export function parseBookingInput(raw: unknown): BookingInput {
   if (phoneDigits.length < 8 || phoneDigits.length > 15 || !/^[+\d\s().-]+$/.test(customerPhone)) throw new Error("Indtast et gyldigt telefonnummer")
   if (notes.length > 1000) throw new Error("Beskeden må højst fylde 1000 tegn")
 
-  return { machineSlug, startDate, endDate, customerName, customerEmail, customerPhone, notes: notes || null }
+  const delivery = deliveryMethod === "delivery"
+  return {
+    machineSlug, startDate, endDate, customerName, customerEmail, customerPhone, notes: notes || null,
+    deliveryMethod: deliveryMethod as DeliveryMethod,
+    deliveryAddress: delivery ? deliveryAddress : null,
+    deliveryPostcode: delivery ? deliveryPostcode : null,
+  }
 }
