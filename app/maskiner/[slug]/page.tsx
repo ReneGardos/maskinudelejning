@@ -1,12 +1,42 @@
-"use client"
-
-import { FormEvent, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { createBooking } from "@/app/actions/bookings"
+import { notFound } from "next/navigation"
+import { and, eq } from "drizzle-orm"
+import { db } from "@/lib/db"
+import { machine } from "@/lib/db/schema"
+import { getSessionUser } from "@/lib/session"
+import { todayInDenmark } from "@/lib/booking-rules"
+import { BookingForm } from "@/components/booking-form"
 
-export default function MachineBookingPage() {
-  const router = useRouter(); const [message, setMessage] = useState(""); const [pending, setPending] = useState(false)
-  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setPending(true); setMessage(""); const form = new FormData(event.currentTarget); try { await createBooking({ machineName: "90 kg pladevibrator", machineSlug: "90kg-pladevibrator", startDate: String(form.get("startDate")), endDate: String(form.get("endDate")), customerName: String(form.get("customerName")), customerEmail: String(form.get("customerEmail")), customerPhone: String(form.get("customerPhone")), notes: String(form.get("notes") || "") }); setMessage("Din forespørgsel er sendt. Vi vender tilbage med en bekræftelse."); event.currentTarget.reset() } catch (error) { const text = error instanceof Error ? error.message : "Der opstod en fejl"; if (text === "Unauthorized") router.push("/sign-in"); else setMessage(text) } finally { setPending(false) } }
-  return <main className="booking-page"><Link href="/maskiner" className="back-link">← Tilbage til maskiner</Link><div className="booking-layout"><section className="booking-intro"><p className="eyebrow">Komprimering · ID 1042</p><h1>90 kg pladevibrator</h1><p className="lead">Stærk og kompakt maskine til belægning, indkørsler og mindre anlægsarbejde.</p><div className="machine-specs"><span><strong>90 kg</strong> vægt</span><span><strong>45 cm</strong> arbejdsbredde</span><span><strong>250 kr.</strong> pr. dag</span></div><img src="/maskiner-hero.png" alt="Pladevibrator og minigraver på byggeplads" /></section><section className="booking-card"><p className="eyebrow">Forespørgsel</p><h2>Book maskinen</h2><p className="muted">Udfyld formularen, så vender vi tilbage med endelig bekræftelse.</p><form className="booking-form" onSubmit={submit}><div className="form-row"><label>Fra<input name="startDate" type="date" required /></label><label>Til<input name="endDate" type="date" required /></label></div><label>Navn<input name="customerName" required /></label><label>Email<input name="customerEmail" type="email" required /></label><label>Telefon<input name="customerPhone" type="tel" required /></label><label>Besked <span className="muted">(valgfrit)</span><textarea name="notes" rows={3} /></label>{message && <p className="success-message">{message}</p>}<button className="button button-dark" disabled={pending}>{pending ? "Sender forespørgsel…" : "Send bookingforespørgsel"}</button></form></section></div></main>
+export default async function MachineBookingPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const [item] = await db.select().from(machine).where(and(eq(machine.slug, slug), eq(machine.active, true))).limit(1)
+  if (!item) notFound()
+  const user = await getSessionUser()
+
+  return (
+    <main className="booking-page">
+      <Link href="/maskiner" className="back-link">← Tilbage til maskiner</Link>
+      <div className="booking-layout">
+        <section className="booking-intro">
+          <p className="eyebrow">{item.category}</p>
+          <h1>{item.name}</h1>
+          <p className="lead">{item.description}</p>
+          <div className="machine-specs"><span><strong>{item.dailyPrice.toLocaleString("da-DK")} kr.</strong> pr. dag ekskl. moms</span></div>
+          <img src={item.image} alt={item.name} />
+        </section>
+        <section className="booking-card">
+          <p className="eyebrow">Forespørgsel</p>
+          <h2>Book maskinen</h2>
+          <p className="muted">Udfyld formularen, så vender vi tilbage med endelig bekræftelse.</p>
+          <BookingForm
+            machine={{ slug: item.slug, name: item.name, dailyPrice: item.dailyPrice }}
+            today={todayInDenmark()}
+            loggedIn={Boolean(user)}
+            defaultName={user?.name ?? ""}
+            defaultEmail={user?.email ?? ""}
+          />
+        </section>
+      </div>
+    </main>
+  )
 }
