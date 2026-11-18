@@ -51,9 +51,9 @@ export function BookingForm({ machine, today, bookedRanges, initialStart, initia
         customerEmail: String(form.get("customerEmail") ?? ""),
         customerPhone: String(form.get("customerPhone") ?? ""),
         notes: String(form.get("notes") ?? ""),
-        deliveryMethod: delivery ? "delivery" : "pickup",
+        deliveryType: delivery ? "delivery" : "collection",
         deliveryAddress: String(form.get("deliveryAddress") ?? ""),
-        deliveryPostcode: String(form.get("deliveryPostcode") ?? ""),
+        deliveryPostalCode: String(form.get("deliveryPostalCode") ?? ""),
       })
       if (result.ok) {
         setSuccess(`Din forespørgsel er sendt (${result.days} ${result.days === 1 ? "dag" : "dage"}, ${result.total.toLocaleString("da-DK")} kr. ekskl. moms). Vi vender tilbage med en bekræftelse. Du kan følge status under Min konto.`)
@@ -93,7 +93,7 @@ export function BookingForm({ machine, today, bookedRanges, initialStart, initia
       {delivery && (
         <div className="form-row">
           <label>Leveringsadresse<input name="deliveryAddress" required minLength={3} maxLength={200} autoComplete="street-address" /></label>
-          <label>Postnummer<input name="deliveryPostcode" required inputMode="numeric" pattern="\d{4}" maxLength={4} autoComplete="postal-code" /></label>
+          <label>Postnummer<input name="deliveryPostalCode" required inputMode="numeric" pattern="\d{4}" maxLength={4} autoComplete="postal-code" /></label>
         </div>
       )}
       <label>Besked <span className="muted">(valgfrit)</span><textarea name="notes" rows={3} maxLength={1000} /></label>

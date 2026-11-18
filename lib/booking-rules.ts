@@ -24,8 +24,8 @@ export function rentalDays(startDate: string, endDate: string) {
   return Math.round((end - start) / 86400000) + 1
 }
 
-export const DELIVERY_METHODS = ["pickup", "delivery"] as const
-export type DeliveryMethod = (typeof DELIVERY_METHODS)[number]
+export const DELIVERY_TYPES = ["collection", "delivery"] as const
+export type DeliveryType = (typeof DELIVERY_TYPES)[number]
 
 /** Kunden kan selv annullere, indtil dagen før lejeperioden starter. */
 export function canCancelBooking(startDate: string, status: string) {
@@ -45,9 +45,9 @@ export type BookingInput = {
   customerEmail: string
   customerPhone: string
   notes: string | null
-  deliveryMethod: DeliveryMethod
+  deliveryType: DeliveryType
   deliveryAddress: string | null
-  deliveryPostcode: string | null
+  deliveryPostalCode: string | null
 }
 
 /** Rensér og valider input fra klienten. Kaster en dansk fejlbesked ved ugyldigt input. */
@@ -63,14 +63,14 @@ export function parseBookingInput(raw: unknown): BookingInput {
   const customerEmail = text("customerEmail").toLowerCase()
   const customerPhone = text("customerPhone")
   const notes = text("notes")
-  const deliveryMethod = text("deliveryMethod") || "pickup"
+  const deliveryType = text("deliveryType") || "collection"
   const deliveryAddress = text("deliveryAddress")
-  const deliveryPostcode = text("deliveryPostcode")
+  const deliveryPostalCode = text("deliveryPostalCode")
 
-  if (!(DELIVERY_METHODS as readonly string[]).includes(deliveryMethod)) throw new Error("Vælg levering eller afhentning")
-  if (deliveryMethod === "delivery") {
+  if (!(DELIVERY_TYPES as readonly string[]).includes(deliveryType)) throw new Error("Vælg levering eller afhentning")
+  if (deliveryType === "delivery") {
     if (deliveryAddress.length < 3 || deliveryAddress.length > 200) throw new Error("Indtast leveringsadressen")
-    if (!/^\d{4}$/.test(deliveryPostcode)) throw new Error("Indtast et gyldigt postnummer (4 cifre)")
+    if (!/^\d{4}$/.test(deliveryPostalCode)) throw new Error("Indtast et gyldigt postnummer (4 cifre)")
   }
   if (!machineSlug || machineSlug.length > 100) throw new Error("Ugyldig maskine")
   if (!isValidDateString(startDate) || !isValidDateString(endDate)) throw new Error("Ugyldige datoer")
@@ -83,11 +83,11 @@ export function parseBookingInput(raw: unknown): BookingInput {
   if (phoneDigits.length < 8 || phoneDigits.length > 15 || !/^[+\d\s().-]+$/.test(customerPhone)) throw new Error("Indtast et gyldigt telefonnummer")
   if (notes.length > 1000) throw new Error("Beskeden må højst fylde 1000 tegn")
 
-  const delivery = deliveryMethod === "delivery"
+  const delivery = deliveryType === "delivery"
   return {
     machineSlug, startDate, endDate, customerName, customerEmail, customerPhone, notes: notes || null,
-    deliveryMethod: deliveryMethod as DeliveryMethod,
+    deliveryType: deliveryType as DeliveryType,
     deliveryAddress: delivery ? deliveryAddress : null,
-    deliveryPostcode: delivery ? deliveryPostcode : null,
+    deliveryPostalCode: delivery ? deliveryPostalCode : null,
   }
 }

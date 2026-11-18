@@ -4,7 +4,7 @@ import { useState } from "react"
 import { updateBookingStatus } from "@/app/actions/bookings"
 import type { BookingStatus } from "@/lib/booking-rules"
 
-type Item = { id: string; customerName: string; customerEmail: string; customerPhone: string; notes: string | null; deliveryMethod: string; deliveryAddress: string | null; deliveryPostcode: string | null; machineName: string; startDate: string; endDate: string; total: number; status: string }
+type Item = { id: string; customerName: string; customerEmail: string; customerPhone: string; notes: string | null; deliveryType: string; deliveryAddress: string | null; deliveryPostalCode: string | null; machineName: string; startDate: string; endDate: string; total: number; status: string }
 
 const statusLabel = (status: string) => status === "pending" ? "Afventer" : status === "confirmed" ? "Bekræftet" : "Annulleret"
 
@@ -28,7 +28,7 @@ export function AdminBookings({ bookings }: { bookings: Item[] }) {
         {items.map((item) => (
           <div className="table-row" key={item.id}>
             <div><strong>{item.customerName}</strong><small>{item.customerEmail} · {item.customerPhone}</small>{item.notes && <small>“{item.notes}”</small>}</div>
-            <span>{item.machineName}<small>{item.total.toLocaleString("da-DK")} kr. ekskl. moms</small><small>{item.deliveryMethod === "delivery" ? `Levering: ${item.deliveryAddress}, ${item.deliveryPostcode}` : "Afhentning"}</small></span>
+            <span>{item.machineName}<small>{item.total.toLocaleString("da-DK")} kr. ekskl. moms</small><small>{item.deliveryType === "delivery" ? `Levering: ${item.deliveryAddress}, ${item.deliveryPostalCode}` : "Afhentning"}</small></span>
             <span>{item.startDate} → {item.endDate}</span>
             <div className="admin-status-actions">
               <span className={`status status-${item.status}`}>{statusLabel(item.status)}</span>

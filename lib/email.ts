@@ -10,9 +10,9 @@ type BookingMail = {
   customerEmail: string
   customerPhone: string
   notes: string | null
-  deliveryMethod: string
+  deliveryType: string
   deliveryAddress: string | null
-  deliveryPostcode: string | null
+  deliveryPostalCode: string | null
 }
 
 export function escapeHtml(value: string) {
@@ -33,7 +33,7 @@ function formatDate(value: string) {
 }
 
 function deliveryLine(b: BookingMail) {
-  return b.deliveryMethod === "delivery" ? `Levering til ${b.deliveryAddress}, ${b.deliveryPostcode} (pris aftales)` : "Afhentning hos os"
+  return b.deliveryType === "delivery" ? `Levering til ${b.deliveryAddress}, ${b.deliveryPostalCode} (pris aftales)` : "Afhentning hos os"
 }
 
 function layout(title: string, lead: string, b: BookingMail, extra = "") {
