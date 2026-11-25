@@ -36,5 +36,5 @@ export default async function Page() {
     })),
   }
   const website = { "@context": "https://schema.org", "@type": "WebSite", name: SITE_NAME, url: SITE_URL, inLanguage: "da-DK" }
-  return <><JsonLd data={business} /><JsonLd data={website} /><HomePage machines={machines} quickMachines={catalog.machines.map((row) => ({ slug: row.slug, name: row.name, category: row.category, dailyPrice: row.dailyPrice, deliveryAvailable: row.deliveryAvailable, bookedRanges: row.bookedRanges }))} zones={catalog.zones} today={catalog.today} /></>
+  return <><JsonLd data={business} /><JsonLd data={website} /><HomePage machines={machines} quickMachines={catalog.machines.map((row) => ({ slug: row.slug, name: row.name, category: row.category, image: row.image, dailyPrice: row.dailyPrice, deliveryAvailable: row.deliveryAvailable, bookedRanges: row.bookedRanges }))} zones={catalog.zones} today={catalog.today} /></>
 }

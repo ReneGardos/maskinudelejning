@@ -21,7 +21,7 @@ type Props = {
   zones: Zone[]
   today: string
   customerPercent: number
-  initialSlug: string
+  initialSlugs: string[]
   initialStart: string
   initialEnd: string
   initialDelivery: boolean
@@ -36,14 +36,14 @@ function formatDate(value: string) {
   return `${d}.${m}.${y}`
 }
 
-export function OrderForm({ machines, zones, today, customerPercent, initialSlug, initialStart, initialEnd, initialDelivery, initialPostalCode, defaults }: Props) {
+export function OrderForm({ machines, zones, today, customerPercent, initialSlugs, initialStart, initialEnd, initialDelivery, initialPostalCode, defaults }: Props) {
   const router = useRouter()
   const bySlug = useMemo(() => new Map(machines.map((item) => [item.slug, item])), [machines])
   const categories = useMemo(() => Array.from(new Set(machines.map((item) => item.category))).sort((a, b) => a.localeCompare(b, "da")), [machines])
 
   const [startDate, setStartDate] = useState(initialStart)
   const [endDate, setEndDate] = useState(initialEnd)
-  const [lines, setLines] = useState<Line[]>(() => bySlug.has(initialSlug) ? [{ key: newKey(), slug: initialSlug, ownPeriod: false, startDate: "", endDate: "", accessories: {} }] : [])
+  const [lines, setLines] = useState<Line[]>(() => initialSlugs.filter((slug) => bySlug.has(slug)).slice(0, MAX_ORDER_LINES).map((slug) => ({ key: newKey(), slug, ownPeriod: false, startDate: "", endDate: "", accessories: {} })))
   const [delivery, setDelivery] = useState(initialDelivery)
   const [address, setAddress] = useState("")
   const [postalCode, setPostalCode] = useState(initialPostalCode)

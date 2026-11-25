@@ -54,7 +54,7 @@ export default async function BookingPage({ searchParams }: Props) {
             zones={zones.map((zone) => ({ id: zone.id, name: zone.name, postalCodes: zone.postalCodes, deliveryFee: zone.deliveryFee, collectionFee: zone.collectionFee }))}
             today={today}
             customerPercent={discount[0]?.percent ?? 0}
-            initialSlug={maskine ?? ""}
+            initialSlugs={Array.from(new Set((maskine ?? "").split(",").map((slug) => slug.trim()).filter(Boolean)))}
             initialStart={validPeriod ? start : ""}
             initialEnd={validPeriod ? end : ""}
             initialDelivery={levering === "1"}

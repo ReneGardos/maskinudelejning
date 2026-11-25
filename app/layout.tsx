@@ -1,7 +1,10 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
+import { Inter } from 'next/font/google'
 import { SITE_AREA, SITE_NAME, SITE_URL } from '@/lib/site'
 import './globals.css'
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swap' })
 
 const description = `Lej pladevibrator, betonblander, brydehammer og flamingoskærer i ${SITE_AREA}. Se ledighed og pris med det samme, book online, og få leveret eller hent selv.`
 
@@ -21,5 +24,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { colorScheme: 'light', themeColor: '#171a1b', width: 'device-width', initialScale: 1 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="da"><body>{children}{process.env.NODE_ENV === 'production' && <Analytics />}</body></html>
+  return <html lang="da" className={inter.variable}><body>{children}{process.env.NODE_ENV === 'production' && <Analytics />}</body></html>
 }
