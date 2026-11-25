@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { company } from '@/lib/company'
+import { QuickBooking, type QuickMachine } from '@/components/quick-booking'
+import type { Zone } from '@/lib/pricing'
 import { LegalLinks } from '@/components/legal-links'
 import { ArrowRight, CalendarDays, ChevronDown, CircleCheck, Clock3, Filter, Menu, PackageCheck, Search, ShieldCheck, Truck, UserRound, X } from 'lucide-react'
 
@@ -12,24 +13,9 @@ export type HomeMachine = { slug: string; name: string; type: string; price: num
 const categories = [{ name: 'Pladevibratorer', q: 'pladevibrator' }, { name: 'Betonblandere', q: 'betonblander' }, { name: 'Brydehamre', q: 'brydehammer' }, { name: 'Flamingoskærere', q: 'flamingo' }]
 const projects = ['Komprimere jord og grus', 'Blande beton og mørtel', 'Nedbryde beton og fliser', 'Skære isolering til fundament']
 
-export default function HomePage({ machines }: { machines: HomeMachine[] }) {
-  const router = useRouter()
+export default function HomePage({ machines, quickMachines, zones, today }: { machines: HomeMachine[]; quickMachines: QuickMachine[]; zones: Zone[]; today: string }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [project, setProject] = useState('')
-  const [search, setSearch] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [postcode, setPostcode] = useState('7400')
-  const [filterOpen, setFilterOpen] = useState(false)
-
-  // Sender datoer og søgeord videre til kataloget, som viser de maskiner, der faktisk er ledige.
-  function findMachines() {
-    const params = new URLSearchParams()
-    if (search.trim()) params.set('q', search.trim())
-    if (startDate && endDate && endDate >= startDate) { params.set('start', startDate); params.set('end', endDate) }
-    const query = params.toString()
-    router.push(query ? `/maskiner?${query}` : '/maskiner')
-  }
 
   return (
     <main className="site-shell">
@@ -38,13 +24,13 @@ export default function HomePage({ machines }: { machines: HomeMachine[] }) {
 
       <section className="hero"><div className="hero-image" /><div className="hero-overlay" /><div className="container hero-content"><div className="eyebrow light"><span className="eyebrow-line" /> MASKINUDLEJNING I MIDTJYLLAND</div><h1>Maskinudlejning i Midtjylland.<br /><em>Kom hurtigere i mål.</em></h1><p>Professionelt materiel, enkel booking og levering lige til døren. Til både private projekter og professionelle opgaver.</p><div className="trust-row"><span><CircleCheck size={16} /> Klar pris fra start</span><span><CircleCheck size={16} /> Fleksibel afhentning</span><span><CircleCheck size={16} /> Lokalt team</span></div></div><div className="hero-number">01 <span>/ 03</span></div></section>
 
-      <section className="booking-wrap" id="booking"><div className="container"><div className="booking-card"><div className="booking-heading"><span className="step-number">01</span><div><p className="eyebrow">HURTIG BOOKING</p><h2>Hvad skal du bruge?</h2></div></div><div className="booking-fields"><label className="search-field"><span>Maskine eller opgave</span><div><Search size={18} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Fx pladevibrator eller terrasse" /></div></label><label><span>Startdato</span><div className="input-like"><CalendarDays size={18} /><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} aria-label="Startdato" /></div></label><label><span>Slutdato</span><div className="input-like"><CalendarDays size={18} /><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} aria-label="Slutdato" /></div></label><label><span>Postnummer</span><div className="input-like"><span className="pin">⌖</span><input value={postcode} onChange={(e) => setPostcode(e.target.value)} inputMode="numeric" placeholder="7400" aria-label="Postnummer" /></div></label><button className="button button-orange" onClick={findMachines}>Find ledige maskiner <ArrowRight size={17} /></button></div></div></div></section>
+      <section className="booking-wrap" id="booking"><div className="container"><div className="booking-card"><div className="booking-heading"><span className="step-number">01</span><div><p className="eyebrow">HURTIG BOOKING</p><h2>Se ledighed og pris med det samme</h2></div></div><QuickBooking machines={quickMachines} zones={zones} today={today} /></div></div></section>
 
       <section className="section categories"><div className="container"><div className="section-head"><div><p className="eyebrow">ALT TIL DIT PROJEKT</p><h2>Find det rigtige materiel</h2></div><Link href="/maskiner" className="text-link">Se alle maskiner <ArrowRight size={16} /></Link></div><div className="category-grid">{categories.map((cat, i) => <Link href={`/maskiner?q=${cat.q}`} className="category-card" key={cat.name}><div className={`category-visual visual-${i + 1}`}><span>0{i + 1}</span></div><div className="category-name">{cat.name}<ArrowRight size={17} /></div></Link>)}</div></div></section>
 
       <section className="section project-finder" id="projekter"><div className="container finder-grid"><div><p className="eyebrow orange">PROJEKTFINDER</p><h2>Hvad skal du have lavet?</h2><p className="muted large">Du behøver ikke kende maskinens navn. Fortæl os om dit projekt, så hjælper vi dig med at finde det rigtige udstyr.</p><div className="project-options">{projects.map((item, i) => <button className={project === item ? 'project-option selected' : 'project-option'} key={item} onClick={() => setProject(item)}><span>0{i + 1}</span>{item}<ArrowRight size={16} /></button>)}</div><Link href="/maskiner" className="button button-dark">Se anbefalinger <ArrowRight size={17} /></Link></div><div className="finder-art"><div className="art-label"><PackageCheck size={18} /><span>Smart match</span><strong>{project || 'Vælg dit projekt'}</strong></div></div></div></section>
 
-      <section className="section machines" id="maskiner"><div className="container"><div className="section-head"><div><p className="eyebrow">KLAR TIL LEJE</p><h2>Populære maskiner</h2></div><div className="catalogue-actions"><button onClick={() => setFilterOpen(!filterOpen)} aria-expanded={filterOpen}><Filter size={15} /> Filtrer</button>{filterOpen && <div className="filter-popover"><strong>Filtrer maskiner</strong><label><input type="checkbox" defaultChecked /> Ledige nu</label><label><input type="checkbox" /> Levering mulig</label><label><input type="checkbox" /> Under 500 kr./dag</label></div>}<Link href="/maskiner" className="text-link">Se kataloget <ArrowRight size={16} /></Link></div></div><div className="machine-grid">{machines.map((machine) => <article className="machine-card" key={machine.slug}><div className="machine-image"><img src={machine.image} alt={machine.name} /></div><div className="machine-body"><p className="machine-type">{machine.type}</p><h3>{machine.name}</h3><p className="specs">{machine.specs}</p><div className="machine-bottom"><div><strong>{machine.price.toLocaleString('da-DK')} kr.</strong><span>/ dag ekskl. moms</span></div><Link href={`/maskiner/${machine.slug}`} className="round-arrow" aria-label={`Se ${machine.name}`}><ArrowRight size={18} /></Link></div></div></article>)}</div></div></section>
+      <section className="section machines" id="maskiner"><div className="container"><div className="section-head"><div><p className="eyebrow">KLAR TIL LEJE</p><h2>Populære maskiner</h2></div><div className="catalogue-actions"><Link href="/maskiner" className="text-link">Se kataloget <ArrowRight size={16} /></Link></div></div><div className="machine-grid">{machines.map((machine) => <article className="machine-card" key={machine.slug}><div className="machine-image"><img src={machine.image} alt={machine.name} /></div><div className="machine-body"><p className="machine-type">{machine.type}</p><h3>{machine.name}</h3><p className="specs">{machine.specs}</p><div className="machine-bottom"><div><strong>{machine.price.toLocaleString('da-DK')} kr.</strong><span>/ dag ekskl. moms</span></div><Link href={`/maskiner/${machine.slug}`} className="round-arrow" aria-label={`Se ${machine.name}`}><ArrowRight size={18} /></Link></div></div></article>)}</div></div></section>
 
       <section className="dark-section" id="saadan"><div className="container"><div className="section-head light-head"><div><p className="eyebrow orange">NEMT FRA START TIL SLUT</p><h2>Sådan fungerer det</h2></div><p className="dark-intro">Vi har gjort det enkelt at leje professionelt materiel.</p></div><div className="steps-grid"><div className="step"><span>01</span><Search size={24} /><h3>Find din maskine</h3><p>Søg på maskine eller fortæl os, hvad du skal i gang med.</p></div><div className="step"><span>02</span><CalendarDays size={24} /><h3>Vælg dato og book</h3><p>Se ledighed med det samme og få en pris uden overraskelser.</p></div><div className="step"><span>03</span><Truck size={24} /><h3>Hent eller få leveret</h3><p>Vi gør maskinen klar. Du kommer hurtigt videre med dit projekt.</p></div></div></div></section>
 

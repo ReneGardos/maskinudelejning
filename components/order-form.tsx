@@ -24,6 +24,8 @@ type Props = {
   initialSlug: string
   initialStart: string
   initialEnd: string
+  initialDelivery: boolean
+  initialPostalCode: string
   defaults: { name: string; email: string; phone: string; company: string }
 }
 
@@ -34,7 +36,7 @@ function formatDate(value: string) {
   return `${d}.${m}.${y}`
 }
 
-export function OrderForm({ machines, zones, today, customerPercent, initialSlug, initialStart, initialEnd, defaults }: Props) {
+export function OrderForm({ machines, zones, today, customerPercent, initialSlug, initialStart, initialEnd, initialDelivery, initialPostalCode, defaults }: Props) {
   const router = useRouter()
   const bySlug = useMemo(() => new Map(machines.map((item) => [item.slug, item])), [machines])
   const categories = useMemo(() => Array.from(new Set(machines.map((item) => item.category))).sort((a, b) => a.localeCompare(b, "da")), [machines])
@@ -42,9 +44,9 @@ export function OrderForm({ machines, zones, today, customerPercent, initialSlug
   const [startDate, setStartDate] = useState(initialStart)
   const [endDate, setEndDate] = useState(initialEnd)
   const [lines, setLines] = useState<Line[]>(() => bySlug.has(initialSlug) ? [{ key: newKey(), slug: initialSlug, ownPeriod: false, startDate: "", endDate: "", accessories: {} }] : [])
-  const [delivery, setDelivery] = useState(false)
+  const [delivery, setDelivery] = useState(initialDelivery)
   const [address, setAddress] = useState("")
-  const [postalCode, setPostalCode] = useState("")
+  const [postalCode, setPostalCode] = useState(initialPostalCode)
   const [codeInput, setCodeInput] = useState("")
   const [code, setCode] = useState<DiscountCodeRule | null>(null)
   const [codeMessage, setCodeMessage] = useState("")
@@ -76,7 +78,8 @@ export function OrderForm({ machines, zones, today, customerPercent, initialSlug
 
   const postalReady = /^\d{4}$/.test(postalCode)
   const zone = delivery && postalReady ? findDeliveryZone(zones, postalCode) : null
-  const noZone = delivery && postalReady && !zone
+  const noZone = delivery && postalReady && !zone && zones.length > 0
+  const priceAgreed = delivery && postalReady && !zone && zones.length === 0
 
   const quote = calculateOrder({
     lines: checked.map((entry) => ({ days: entry.days, dailyPrice: entry.machine.dailyPrice, machineDeposit: entry.machine.deposit, accessories: entry.chosen.map((item) => ({ dailyPrice: item.dailyPrice, deposit: item.deposit, quantity: item.quantity })) })),
@@ -242,6 +245,7 @@ export function OrderForm({ machines, zones, today, customerPercent, initialSlug
               </div>
               {zone && <p className="muted">Leveringszone: <strong>{zone.name}</strong> · {formatKr(quote.deliveryFee)} for levering og afhentning</p>}
               {noZone && <p className="form-error" role="alert">Vi leverer desværre ikke til det postnummer. Kontakt os, eller vælg afhentning.</p>}
+              {priceAgreed && <p className="muted">Leveringsprisen aftales, når vi bekræfter bookingen.</p>}
             </>
           )}
         </section>
@@ -271,7 +275,7 @@ export function OrderForm({ machines, zones, today, customerPercent, initialSlug
         )}
         <div className="summary-totals">
           <div className="summary-row"><span>Leje</span><span>{formatKr(quote.subtotal)}</span></div>
-          {delivery && <div className="summary-row"><span>Levering og afhentning</span><span>{zone ? formatKr(quote.deliveryFee) : "–"}</span></div>}
+          {delivery && <div className="summary-row"><span>Levering og afhentning</span><span>{zone ? formatKr(quote.deliveryFee) : priceAgreed ? "Aftales" : "–"}</span></div>}
           {quote.discount > 0 && <div className="summary-row discount"><span>Rabat<small>{quote.discountLabel}</small></span><span>−{formatKr(quote.discount)}</span></div>}
           <div className="summary-row summary-total"><span>I alt ekskl. moms</span><span>{formatKr(quote.total)}</span></div>
           {quote.deposit > 0 && <div className="summary-row summary-deposit"><span>Depositum<small>Opkræves separat og refunderes</small></span><span>{formatKr(quote.deposit)}</span></div>}

@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { and, asc, eq } from "drizzle-orm"
+import { and, asc, eq, ne } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { accessory, machine } from "@/lib/db/schema"
 import { getBookedRanges } from "@/lib/availability"
@@ -9,6 +9,7 @@ import { formatKr } from "@/lib/pricing"
 import type { Metadata } from "next"
 import { cache } from "react"
 import { JsonLd } from "@/components/json-ld"
+import { MachinePlanner } from "@/components/machine-planner"
 import { SITE_AREA, SITE_NAME, absoluteUrl } from "@/lib/site"
 
 // Samme opslag bruges af både metadata og siden; cache gør, at databasen kun spørges én gang.
@@ -40,14 +41,16 @@ export default async function MachineBookingPage({ params, searchParams }: Props
   const { start, end } = await searchParams
   const item = await getMachine(slug)
   if (!item) notFound()
-  const [bookedRanges, accessories] = await Promise.all([
+  const [bookedRanges, accessories, others] = await Promise.all([
     getBookedRanges(item.slug),
     db.select().from(accessory).where(and(eq(accessory.machineId, item.id), eq(accessory.active, true))).orderBy(asc(accessory.name)),
+    db.select().from(machine).where(and(eq(machine.active, true), ne(machine.id, item.id))).orderBy(asc(machine.name)),
   ])
+  // Samme kategori først, derefter resten.
+  const related = [...others.filter((row) => row.category === item.category), ...others.filter((row) => row.category !== item.category)].slice(0, 3)
   const today = todayInDenmark()
   const validPeriod = start && end && isValidDateString(start) && isValidDateString(end) && end >= start && start >= today
   const specs = Object.entries(item.specifications ?? {})
-  const formatDate = (value: string) => value.split("-").reverse().join(".")
 
   // Produktdata til Google: navn, billede og dagspris.
   const productData = {
@@ -79,39 +82,66 @@ export default async function MachineBookingPage({ params, searchParams }: Props
   }
 
   return (
-    <main className="booking-page">
+    <main className="machine-page">
       <JsonLd data={productData} />
       <JsonLd data={breadcrumbs} />
-      <Link href="/maskiner" className="back-link">← Tilbage til maskiner</Link>
-      <div className="booking-layout">
-        <section className="booking-intro">
-          <p className="eyebrow">{item.category}</p>
-          <h1>{item.name}</h1>
-          <p className="lead">{item.description}</p>
-          <div className="machine-specs">
-            <span><strong>{formatKr(item.dailyPrice)}</strong> pr. dag ekskl. moms</span>
-            {item.deposit > 0 && <span>Depositum: <strong>{formatKr(item.deposit)}</strong> (refunderes)</span>}
+      <header className="navbar"><div className="container nav-inner"><Link href="/" className="brand"><span className="brand-mark">M</span><span>maskin<span>udlejning</span><small>MASKINER TIL DINE PROJEKTER</small></span></Link><nav className="nav-links"><Link href="/maskiner">Maskiner</Link><Link href="/min-konto">Min konto</Link></nav><Link href="/booking" className="button button-dark">Ny booking</Link></div></header>
+      <div className="container machine-shell">
+        <nav className="breadcrumbs" aria-label="Brødkrummer"><Link href="/">Forside</Link><span>/</span><Link href="/maskiner">Maskiner</Link><span>/</span><span aria-current="page">{item.name}</span></nav>
+        <div className="machine-hero">
+          <div className="machine-photo"><img src={item.image} alt={item.name} /></div>
+          <div className="machine-info">
+            <p className="eyebrow">{item.category}</p>
+            <h1>{item.name}</h1>
+            <p className="lead">{item.description}</p>
+            <div className="machine-price"><strong>{formatKr(item.dailyPrice)}</strong><span>pr. dag ekskl. moms ({formatKr(Math.round(item.dailyPrice * 1.25))} inkl. moms)</span></div>
+            <ul className="machine-facts">
+              <li>{item.deliveryAvailable ? "Levering og afhentning mulig" : "Kun afhentning"}</li>
+              <li>{item.deposit > 0 ? `Depositum ${formatKr(item.deposit)}, refunderes ved aflevering` : "Intet depositum"}</li>
+              <li>Gennemgås og klargøres før hver udlejning</li>
+              <li>Gratis afbestilling indtil dagen før start</li>
+            </ul>
+            {specs.length > 0 && (
+              <dl className="spec-table">
+                {specs.map(([key, value]) => <div key={key}><dt>{key.charAt(0).toUpperCase() + key.slice(1)}</dt><dd>{value}</dd></div>)}
+              </dl>
+            )}
           </div>
-          {specs.length > 0 && (
-            <dl className="spec-list">
-              {specs.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}
-            </dl>
-          )}
-          <img src={item.image} alt={item.name} />
+        </div>
+
+        <section className="machine-section">
+          <h2>Vælg periode</h2>
+          <MachinePlanner
+            slug={item.slug} name={item.name} dailyPrice={item.dailyPrice} deposit={item.deposit} deliveryAvailable={item.deliveryAvailable}
+            bookedRanges={bookedRanges} today={today} initialStart={validPeriod ? start! : ""} initialEnd={validPeriod ? end! : ""}
+            accessories={accessories.map((row) => ({ id: row.id, name: row.name, dailyPrice: row.dailyPrice, deposit: row.deposit }))}
+          />
         </section>
-        <section className="booking-card">
-          <p className="eyebrow">Booking</p>
-          <h2>Book maskinen</h2>
-          <p className="muted">Vælg periode, tilbehør og levering. Du kan tilføje flere maskiner i samme booking og ser den samlede pris, før du sender.</p>
-          {accessories.length > 0 && (
-            <div className="machine-accessories"><span className="order-sub">Tilbehør til denne maskine</span>
-              <ul>{accessories.map((row) => <li key={row.id}><strong>{row.name}</strong> · {formatKr(row.dailyPrice)} pr. dag{row.deposit > 0 ? ` · depositum ${formatKr(row.deposit)}` : ""}</li>)}</ul>
+
+        {accessories.length > 0 && (
+          <section className="machine-section">
+            <h2>Tilbehør</h2>
+            <div className="accessory-grid">
+              {accessories.map((row) => <div className="accessory-card" key={row.id}><strong>{row.name}</strong>{row.description && <p className="muted">{row.description}</p>}<span>{formatKr(row.dailyPrice)} pr. dag{row.deposit > 0 ? ` · depositum ${formatKr(row.deposit)}` : ""}</span></div>)}
             </div>
-          )}
-          {bookedRanges.length > 0 && <p className="muted"><strong>Allerede optaget:</strong> {bookedRanges.map((range) => range.startDate === range.endDate ? formatDate(range.startDate) : `${formatDate(range.startDate)} – ${formatDate(range.endDate)}`).join(" · ")}</p>}
-          <Link href={`/booking?${new URLSearchParams({ maskine: item.slug, ...(validPeriod ? { start: start!, end: end! } : {}) }).toString()}`} className="button button-dark order-submit">Book denne maskine</Link>
-          <p className="muted small-print">{item.deliveryAvailable ? "Kan afhentes eller leveres." : "Kan kun afhentes."}</p>
-        </section>
+          </section>
+        )}
+
+        {related.length > 0 && (
+          <section className="machine-section">
+            <div className="section-head-row"><h2>Andre maskiner</h2><Link href="/maskiner" className="text-link">Se hele kataloget</Link></div>
+            <div className="related-grid">
+              {related.map((row) => (
+                <Link href={`/maskiner/${row.slug}${validPeriod ? `?start=${start}&end=${end}` : ""}`} className="related-card" key={row.id}>
+                  <img src={row.image} alt="" loading="lazy" />
+                  <span className="machine-type">{row.category}</span>
+                  <strong>{row.name}</strong>
+                  <span>{formatKr(row.dailyPrice)} pr. dag</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </main>
   )

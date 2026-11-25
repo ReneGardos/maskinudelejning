@@ -1,53 +1,140 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, SlidersHorizontal } from "lucide-react"
-import { useMemo, useState } from "react"
+import { ArrowRight, Check, CircleAlert, Search, Truck, X } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { addDays, bookingHref, daysBetween, formatShortDate, isFree, nextFreeStart, periodPresets } from "@/lib/availability-rules"
+import { formatKr } from "@/lib/pricing"
+import type { CatalogMachine } from "@/lib/catalog"
 
-type Machine = { id: string; slug: string; name: string; category: string; description: string; dailyPrice: number; image: string }
-type Period = { start: string; end: string } | null
+type Sort = "category" | "price-asc" | "price-desc"
 
-function formatDate(value: string) {
-  const [y, m, d] = value.split("-")
-  return `${d}.${m}.${y}`
-}
+export function MachineCatalogue({ machines, today, initialStart, initialEnd, initialQuery }: { machines: CatalogMachine[]; today: string; initialStart: string; initialEnd: string; initialQuery: string }) {
+  const [query, setQuery] = useState(initialQuery)
+  const [category, setCategory] = useState("")
+  const [sort, setSort] = useState<Sort>("category")
+  const [start, setStart] = useState(initialStart)
+  const [end, setEnd] = useState(initialEnd)
+  const [onlyFree, setOnlyFree] = useState(Boolean(initialStart))
+  const [onlyDelivery, setOnlyDelivery] = useState(false)
 
-export function MachineCatalogue({ machines, period, today, initialQuery }: { machines: Machine[]; period: Period; today: string; initialQuery: string }) {
-  const [query, setQuery] = useState(initialQuery); const [category, setCategory] = useState("Alle kategorier")
-  const categories = ["Alle kategorier", ...Array.from(new Set(machines.map((machine) => machine.category)))]
-  const filtered = useMemo(() => machines.filter((machine) => machine.name.toLowerCase().includes(query.toLowerCase()) && (category === "Alle kategorier" || machine.category === category)), [machines, query, category])
-  // Med en valgt periode sendes datoerne videre til maskinsiden, så de er udfyldt dér.
-  const machineHref = (slug: string) => period ? `/maskiner/${slug}?start=${period.start}&end=${period.end}` : `/maskiner/${slug}`
+  const presets = useMemo(() => periodPresets(today), [today])
+  const validPeriod = Boolean(start && end && end >= start && start >= today)
+  const days = validPeriod ? daysBetween(start, end) : 0
+
+  // Periode og søgning gemmes i adressen, så et link til kataloget kan deles eller bogmærkes.
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (query.trim()) params.set("q", query.trim())
+    if (validPeriod) { params.set("start", start); params.set("end", end) }
+    const next = params.toString() ? `/maskiner?${params}` : "/maskiner"
+    if (`${window.location.pathname}${window.location.search}` !== next) window.history.replaceState(null, "", next)
+  }, [query, start, end, validPeriod])
+
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const item of machines) counts.set(item.category, (counts.get(item.category) ?? 0) + 1)
+    return Array.from(counts, ([name, count]) => ({ name, count }))
+  }, [machines])
+
+  const results = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    const rows = machines
+      .map((item) => {
+        const free = validPeriod ? isFree(item.bookedRanges, start, end) : null
+        return { item, free, nextStart: free === false ? nextFreeStart(item.bookedRanges, addDays(start, 1), days) : null }
+      })
+      .filter(({ item, free }) =>
+        (!needle || `${item.name} ${item.category} ${item.description}`.toLowerCase().includes(needle)) &&
+        (!category || item.category === category) &&
+        (!onlyDelivery || item.deliveryAvailable) &&
+        (!onlyFree || free !== false))
+    if (sort === "price-asc") rows.sort((a, b) => a.item.dailyPrice - b.item.dailyPrice)
+    if (sort === "price-desc") rows.sort((a, b) => b.item.dailyPrice - a.item.dailyPrice)
+    return rows
+  }, [machines, query, category, onlyDelivery, onlyFree, sort, validPeriod, start, end, days])
+
+  const freeCount = validPeriod ? machines.filter((item) => isFree(item.bookedRanges, start, end)).length : machines.length
+
+  function clearPeriod() { setStart(""); setEnd(""); setOnlyFree(false) }
+
   return (
-    <div className="catalogue-layout">
-      <aside className="filters">
-        <div className="filter-title"><strong>Filtrer maskiner</strong><SlidersHorizontal size={17}/></div>
-        <label>Søg efter maskine<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Fx pladevibrator" /></label>
-        <label>Kategori<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select></label>
-        <form className="filter-box" method="get" action="/maskiner" key={`${period?.start}-${period?.end}`}>
-          <strong>Ledig i periode</strong>
-          <label>Fra<input type="date" name="start" min={today} defaultValue={period?.start ?? ""} required /></label>
-          <label>Til<input type="date" name="end" min={today} defaultValue={period?.end ?? ""} required /></label>
-          <button type="submit" className="button button-dark">Vis ledige maskiner</button>
-          {period && <Link href="/maskiner" className="text-link">Ryd datoer</Link>}
-        </form>
-      </aside>
-      <div className="catalogue-results">
-        <div className="results-head"><span><strong>{filtered.length}</strong> {period ? `maskiner ledige ${formatDate(period.start)} – ${formatDate(period.end)}` : "maskiner fundet"}</span></div>
-        {filtered.length ? (
-          <div className="machine-grid">{filtered.map((machine) => (
-            <article className="machine-card" key={machine.id}>
-              <div className="machine-image"><img src={machine.image} alt={machine.name} />{period && <span className="machine-tag">Ledig i perioden</span>}</div>
-              <div className="machine-body">
-                <span className="machine-type">{machine.category}</span><h3>{machine.name}</h3><p className="specs">{machine.description}</p>
-                <div className="machine-bottom"><div><strong>{machine.dailyPrice} kr.</strong><span>pr. dag ekskl. moms</span></div><Link href={machineHref(machine.slug)} className="round-arrow" aria-label={`Book ${machine.name}`}><ArrowRight size={17}/></Link></div>
-              </div>
-            </article>
-          ))}</div>
-        ) : (
-          <div className="empty-state"><h2>Ingen maskiner fundet</h2><p className="muted">{period ? "Ingen maskiner matcher i den periode. Prøv andre datoer eller en anden søgning." : "Prøv en anden søgning eller kategori."}</p></div>
-        )}
+    <div className="catalogue-v2">
+      <div className="catalogue-toolbar">
+        <label className="catalogue-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Søg fx pladevibrator, beton eller isolering" aria-label="Søg i maskiner" />{query && <button type="button" onClick={() => setQuery("")} aria-label="Ryd søgning"><X size={16} /></button>}</label>
+        <div className="catalogue-period">
+          <label>Fra<input type="date" min={today} value={start} onChange={(event) => { setStart(event.target.value); if (!end || event.target.value > end) setEnd(event.target.value); setOnlyFree(true) }} /></label>
+          <label>Til<input type="date" min={start || today} value={end} onChange={(event) => { setEnd(event.target.value); setOnlyFree(true) }} /></label>
+          <div className="chip-row">
+            {presets.map((preset) => <button type="button" key={preset.label} className={start === preset.start && end === preset.end ? "chip active" : "chip"} onClick={() => { setStart(preset.start); setEnd(preset.end); setOnlyFree(true) }}>{preset.label}</button>)}
+            {(start || end) && <button type="button" className="text-link" onClick={clearPeriod}>Ryd datoer</button>}
+          </div>
+        </div>
       </div>
+
+      <div className="catalogue-filters">
+        <div className="chip-row" role="group" aria-label="Kategori">
+          <button type="button" className={!category ? "chip active" : "chip"} onClick={() => setCategory("")}>Alle <span className="chip-count">{machines.length}</span></button>
+          {categories.map((item) => <button type="button" key={item.name} className={category === item.name ? "chip active" : "chip"} onClick={() => setCategory(item.name)}>{item.name} <span className="chip-count">{item.count}</span></button>)}
+        </div>
+        <div className="catalogue-options">
+          {validPeriod && <label className="check"><input type="checkbox" checked={onlyFree} onChange={(event) => setOnlyFree(event.target.checked)} /> Kun ledige</label>}
+          <label className="check"><input type="checkbox" checked={onlyDelivery} onChange={(event) => setOnlyDelivery(event.target.checked)} /> Kan leveres</label>
+          <select value={sort} onChange={(event) => setSort(event.target.value as Sort)} aria-label="Sortering">
+            <option value="category">Sortér: kategori</option>
+            <option value="price-asc">Pris: lav til høj</option>
+            <option value="price-desc">Pris: høj til lav</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="results-head">
+        <span><strong>{results.length}</strong> {results.length === 1 ? "maskine" : "maskiner"}{validPeriod ? ` · ${freeCount} ledige ${formatShortDate(start)} – ${formatShortDate(end)} (${days} ${days === 1 ? "dag" : "dage"})` : ""}</span>
+      </div>
+
+      {results.length ? (
+        <div className="machine-grid">
+          {results.map(({ item, free, nextStart }) => {
+            const detailHref = validPeriod ? `/maskiner/${item.slug}?start=${start}&end=${end}` : `/maskiner/${item.slug}`
+            return (
+              <article className={`machine-card catalogue-card${free === false ? " is-busy" : ""}`} key={item.id}>
+                <Link href={detailHref} className="machine-image">
+                  <img src={item.image} alt={item.name} loading="lazy" />
+                  {free === true && <span className="availability-badge ok"><Check size={14} /> Ledig</span>}
+                  {free === false && <span className="availability-badge busy"><CircleAlert size={14} /> Optaget</span>}
+                </Link>
+                <div className="machine-body">
+                  <span className="machine-type">{item.category}</span>
+                  <h3><Link href={detailHref}>{item.name}</Link></h3>
+                  <p className="specs">{item.description}</p>
+                  {item.specs.length > 0 && <ul className="spec-chips">{item.specs.slice(0, 3).map(([key, value]) => <li key={key} title={key}>{value}</li>)}</ul>}
+                  <div className="card-meta">
+                    {item.deliveryAvailable && <span><Truck size={14} /> Kan leveres</span>}
+                    {item.accessoryCount > 0 && <span>{item.accessoryCount} tilbehør</span>}
+                    {item.deposit > 0 && <span>Depositum {formatKr(item.deposit)}</span>}
+                  </div>
+                  {free === false && <p className="busy-note">{nextStart ? <>Ledig igen fra <button type="button" className="text-link" onClick={() => { setStart(nextStart); setEnd(addDays(nextStart, days - 1)) }}>{formatShortDate(nextStart)}</button></> : "Ikke ledig inden for et år"}</p>}
+                  <div className="machine-bottom">
+                    <div>
+                      <strong>{formatKr(item.dailyPrice)}</strong><span>pr. dag ekskl. moms</span>
+                      {validPeriod && <small className="period-price">{days} {days === 1 ? "dag" : "dage"}: {formatKr(days * item.dailyPrice)}</small>}
+                    </div>
+                    {free === false
+                      ? <Link href={detailHref} className="button button-light">Se ledighed</Link>
+                      : <Link href={bookingHref({ slug: item.slug, start: validPeriod ? start : undefined, end: validPeriod ? end : undefined })} className="button button-dark">Book <ArrowRight size={16} /></Link>}
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="empty-state">
+          <h2>Ingen maskiner matcher</h2>
+          <p className="muted">{validPeriod && onlyFree ? "Ingen ledige maskiner matcher i den periode. Prøv andre datoer, eller slå \"Kun ledige\" fra." : "Prøv en anden søgning eller kategori."}</p>
+          <button type="button" className="button button-dark" onClick={() => { setQuery(""); setCategory(""); setOnlyDelivery(false); setOnlyFree(false) }}>Nulstil filtre</button>
+        </div>
+      )}
     </div>
   )
 }

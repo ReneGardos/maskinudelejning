@@ -11,13 +11,13 @@ import { noIndex } from "@/lib/site"
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Ny booking", ...noIndex }
 
-type Props = { searchParams: Promise<{ maskine?: string; start?: string; end?: string }> }
+type Props = { searchParams: Promise<{ maskine?: string; start?: string; end?: string; levering?: string; postnr?: string }> }
 
 export default async function BookingPage({ searchParams }: Props) {
-  const { maskine, start, end } = await searchParams
+  const { maskine, start, end, levering, postnr } = await searchParams
   const user = await getSessionUser()
   if (!user) {
-    const query = new URLSearchParams(Object.entries({ maskine, start, end }).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1] !== "")).toString()
+    const query = new URLSearchParams(Object.entries({ maskine, start, end, levering, postnr }).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1] !== "")).toString()
     redirect(`/sign-in?next=${encodeURIComponent(`/booking${query ? `?${query}` : ""}`)}`)
   }
 
@@ -57,6 +57,8 @@ export default async function BookingPage({ searchParams }: Props) {
             initialSlug={maskine ?? ""}
             initialStart={validPeriod ? start : ""}
             initialEnd={validPeriod ? end : ""}
+            initialDelivery={levering === "1"}
+            initialPostalCode={postnr && /^\d{4}$/.test(postnr) ? postnr : ""}
             defaults={{ name: user.name, email: user.email, phone: lastOrder[0]?.phone ?? "", company: lastOrder[0]?.company ?? "" }}
           />
         )}

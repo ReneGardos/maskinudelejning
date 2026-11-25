@@ -90,7 +90,8 @@ export async function createOrder(raw: unknown): Promise<ActionResult<{ orderNum
   if (delivery) {
     const zones = await db.select().from(deliveryZone).where(eq(deliveryZone.active, true))
     zone = findDeliveryZone(zones, input.deliveryPostalCode ?? "")
-    if (!zone) return { ok: false, error: "Vi leverer desværre ikke til det postnummer. Kontakt os, eller vælg afhentning." }
+    // Er der slet ingen leveringszoner sat op, tages levering imod, og prisen aftales ved bekræftelsen.
+    if (!zone && zones.length > 0) return { ok: false, error: "Vi leverer desværre ikke til det postnummer. Kontakt os, eller vælg afhentning." }
   }
 
   const accessoryIds = Array.from(new Set(input.lines.flatMap((line) => line.accessories.map((item) => item.id))))
