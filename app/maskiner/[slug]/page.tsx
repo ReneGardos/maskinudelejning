@@ -21,8 +21,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params
   const item = await getMachine(slug)
   if (!item) return { title: "Maskinen findes ikke", robots: { index: false } }
-  const title = `Lej ${item.name.charAt(0).toLowerCase()}${item.name.slice(1)} – ${item.dailyPrice} kr./dag`
-  const description = `${item.description} Lej ${item.name.toLowerCase()} fra ${formatKr(item.dailyPrice)} pr. dag ekskl. moms i ${SITE_AREA}. Se ledighed og book online${item.deliveryAvailable ? " med levering" : ""}.`.slice(0, 300)
+  const lowerName = `${item.name.charAt(0).toLowerCase()}${item.name.slice(1)}`
+  const title = `Lej ${lowerName} – ${item.dailyPrice} kr./dag`
+  const description = `${item.description} Lej ${lowerName} fra ${formatKr(item.dailyPrice)} pr. dag ekskl. moms i ${SITE_AREA}. Se ledighed og book online${item.deliveryAvailable ? " med levering" : ""}.`.slice(0, 300)
   return {
     title,
     description,
