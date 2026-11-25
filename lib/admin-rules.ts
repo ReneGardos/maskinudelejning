@@ -169,3 +169,61 @@ export function parseZoneInput(raw: unknown): ZoneInput {
     active: input.active === true,
   }
 }
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
+
+function optionalDate(input: Raw, key: string, label: string) {
+  const value = text(input, key)
+  if (!value) return null
+  const parsed = new Date(`${value}T00:00:00Z`)
+  if (!DATE_ONLY.test(value) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) throw new Error(`${label} er ikke en gyldig dato`)
+  return value
+}
+
+export type DiscountCodeInput = {
+  id: string | null
+  code: string
+  kind: "percent" | "amount"
+  value: number
+  minSubtotal: number
+  validFrom: string | null
+  validUntil: string | null
+  maxUses: number | null
+  active: boolean
+  note: string | null
+}
+
+export function parseDiscountCodeInput(raw: unknown): DiscountCodeInput {
+  const input = asRecord(raw)
+  const code = text(input, "code").toUpperCase().replace(/\s+/g, "")
+  if (!/^[A-Z0-9ÆØÅ_-]{3,30}$/.test(code)) throw new Error("Koden skal være 3–30 tegn og må kun indeholde bogstaver, tal, - og _")
+  const kind = text(input, "kind")
+  if (kind !== "percent" && kind !== "amount") throw new Error("Vælg procent eller kronebeløb")
+  const value = kind === "percent" ? whole(input, "value", "Rabat i procent", 1, 100) : whole(input, "value", "Rabat i kr.", 1, 1000000)
+  const validFrom = optionalDate(input, "validFrom", "Startdato")
+  const validUntil = optionalDate(input, "validUntil", "Slutdato")
+  if (validFrom && validUntil && validUntil < validFrom) throw new Error("Slutdatoen kan ikke være før startdatoen")
+  const maxUsesRaw = input.maxUses
+  const maxUses = maxUsesRaw === null || maxUsesRaw === undefined || maxUsesRaw === "" ? null : whole(input, "maxUses", "Maks antal brug", 1, 100000)
+  const note = text(input, "note")
+  length(note, "Note", 0, 200)
+  return {
+    id: text(input, "id") || null,
+    code, kind, value,
+    minSubtotal: input.minSubtotal === "" || input.minSubtotal === undefined ? 0 : whole(input, "minSubtotal", "Minimumsbeløb", 0, 10000000),
+    validFrom, validUntil, maxUses,
+    active: input.active === true,
+    note: note || null,
+  }
+}
+
+export type CustomerDiscountInput = { userId: string; percent: number; note: string | null }
+
+export function parseCustomerDiscountInput(raw: unknown): CustomerDiscountInput {
+  const input = asRecord(raw)
+  const userId = text(input, "userId")
+  if (!userId || userId.length > 100) throw new Error("Ugyldig kunde")
+  const note = text(input, "note")
+  length(note, "Note", 0, 200)
+  return { userId, percent: whole(input, "percent", "Rabat", 0, 100), note: note || null }
+}

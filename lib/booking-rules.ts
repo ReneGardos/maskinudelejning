@@ -114,3 +114,101 @@ export function parseBookingInput(raw: unknown): BookingInput {
     accessories,
   }
 }
+
+// ---- Samlet booking med flere maskiner ----
+
+export const MAX_ORDER_LINES = 10
+
+export type OrderLine = { machineSlug: string; startDate: string; endDate: string; accessories: Array<{ id: string; quantity: number }> }
+
+export type OrderInput = {
+  lines: OrderLine[]
+  customerName: string
+  customerEmail: string
+  customerPhone: string
+  company: string | null
+  notes: string | null
+  deliveryType: DeliveryType
+  deliveryAddress: string | null
+  deliveryPostalCode: string | null
+  discountCode: string | null
+}
+
+/** Kontrollér en lejeperiode. Kaster en dansk fejlbesked; label bruges til at sige, hvilken maskine det gælder. */
+export function checkPeriod(startDate: string, endDate: string, label = "") {
+  const prefix = label ? `${label}: ` : ""
+  if (!isValidDateString(startDate) || !isValidDateString(endDate)) throw new Error(`${prefix}Vælg gyldige datoer`)
+  if (endDate < startDate) throw new Error(`${prefix}Slutdatoen kan ikke være før startdatoen`)
+  if (startDate < todayInDenmark()) throw new Error(`${prefix}Startdatoen kan ikke ligge i fortiden`)
+  if (rentalDays(startDate, endDate) > MAX_RENTAL_DAYS) throw new Error(`${prefix}Maskiner kan højst lejes i ${MAX_RENTAL_DAYS} dage ad gangen. Kontakt os ved længere perioder.`)
+}
+
+/** Normalisér en rabatkode: store bogstaver, ingen mellemrum. */
+export function normalizeCode(value: string) {
+  return value.trim().toUpperCase().replace(/\s+/g, "")
+}
+
+export function parseOrderInput(raw: unknown): OrderInput {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Ugyldig forespørgsel")
+  const input = raw as Record<string, unknown>
+  const text = (key: string) => (typeof input[key] === "string" ? (input[key] as string).trim() : "")
+
+  if (input.acceptTerms !== true) throw new Error("Du skal acceptere handelsbetingelserne for at sende bookingen")
+  if (!Array.isArray(input.lines) || input.lines.length === 0) throw new Error("Tilføj mindst én maskine")
+  if (input.lines.length > MAX_ORDER_LINES) throw new Error(`Højst ${MAX_ORDER_LINES} maskiner pr. booking. Kontakt os ved større opgaver.`)
+
+  const lines: OrderLine[] = input.lines.map((entry, index) => {
+    const line = (entry ?? {}) as Record<string, unknown>
+    const machineSlug = typeof line.machineSlug === "string" ? line.machineSlug.trim() : ""
+    const startDate = typeof line.startDate === "string" ? line.startDate.trim() : ""
+    const endDate = typeof line.endDate === "string" ? line.endDate.trim() : ""
+    if (!machineSlug || machineSlug.length > 100) throw new Error(`Maskine ${index + 1}: ugyldig maskine`)
+    checkPeriod(startDate, endDate, `Maskine ${index + 1}`)
+    return { machineSlug, startDate, endDate, accessories: parseAccessories(line.accessories) }
+  })
+  // Samme maskine må gerne bookes flere gange i samme booking, men ikke i overlappende perioder.
+  for (let i = 0; i < lines.length; i++) for (let j = i + 1; j < lines.length; j++) {
+    if (lines[i].machineSlug === lines[j].machineSlug && rangesOverlap(lines[i].startDate, lines[i].endDate, lines[j].startDate, lines[j].endDate)) {
+      throw new Error(`Maskine ${i + 1} og ${j + 1} er den samme maskine i overlappende perioder`)
+    }
+  }
+
+  const customerName = text("customerName")
+  const customerEmail = text("customerEmail").toLowerCase()
+  const customerPhone = text("customerPhone")
+  const company = text("company")
+  const notes = text("notes")
+  const deliveryType = text("deliveryType") || "collection"
+  const deliveryAddress = text("deliveryAddress")
+  const deliveryPostalCode = text("deliveryPostalCode")
+  const discountCode = normalizeCode(text("discountCode"))
+
+  if (!(DELIVERY_TYPES as readonly string[]).includes(deliveryType)) throw new Error("Vælg levering eller afhentning")
+  if (deliveryType === "delivery") {
+    if (deliveryAddress.length < 3 || deliveryAddress.length > 200) throw new Error("Indtast leveringsadressen")
+    if (!/^\d{4}$/.test(deliveryPostalCode)) throw new Error("Indtast et gyldigt postnummer (4 cifre)")
+  }
+  if (customerName.length < 2 || customerName.length > 100) throw new Error("Indtast dit navn")
+  if (customerEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) throw new Error("Indtast en gyldig e-mailadresse")
+  const phoneDigits = customerPhone.replace(/\D/g, "")
+  if (phoneDigits.length < 8 || phoneDigits.length > 15 || !/^[+\d\s().-]+$/.test(customerPhone)) throw new Error("Indtast et gyldigt telefonnummer")
+  if (company.length > 120) throw new Error("Firmanavnet må højst fylde 120 tegn")
+  if (notes.length > 1000) throw new Error("Beskeden må højst fylde 1000 tegn")
+  if (discountCode.length > 40) throw new Error("Ugyldig rabatkode")
+
+  const delivery = deliveryType === "delivery"
+  return {
+    lines, customerName, customerEmail, customerPhone,
+    company: company || null, notes: notes || null,
+    deliveryType: deliveryType as DeliveryType,
+    deliveryAddress: delivery ? deliveryAddress : null,
+    deliveryPostalCode: delivery ? deliveryPostalCode : null,
+    discountCode: discountCode || null,
+  }
+}
+
+/** Kan kunden selv annullere hele bookingen? Kun hvis ingen maskine er startet eller starter i dag. */
+export function canCancelOrder(lines: Array<{ startDate: string; status: string }>) {
+  const active = lines.filter((line) => line.status !== "cancelled")
+  return active.length > 0 && active.every((line) => canCancelBooking(line.startDate, line.status))
+}

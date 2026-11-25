@@ -4,6 +4,8 @@ import { LogoutButton } from "@/components/logout-button"
 const links = [
   { href: "/admin", label: "Bookinger" },
   { href: "/admin/maskiner", label: "Maskiner" },
+  { href: "/admin/kunder", label: "Kunder" },
+  { href: "/admin/rabatkoder", label: "Rabatkoder" },
   { href: "/admin/zoner", label: "Leveringszoner" },
 ]
 

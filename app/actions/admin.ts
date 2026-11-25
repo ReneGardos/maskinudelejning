@@ -4,9 +4,9 @@ import { randomUUID } from "crypto"
 import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
-import { accessory, deliveryZone, machine } from "@/lib/db/schema"
+import { accessory, customerDiscount, deliveryZone, discountCode, machine, user } from "@/lib/db/schema"
 import { requireAdmin } from "@/lib/session"
-import { parseAccessoryInput, parseMachineInput, parseZoneInput } from "@/lib/admin-rules"
+import { parseAccessoryInput, parseCustomerDiscountInput, parseDiscountCodeInput, parseMachineInput, parseZoneInput } from "@/lib/admin-rules"
 import { type ActionResult, errorCode } from "@/lib/action-result"
 
 const FORBIDDEN = "Du har ikke adgang til at ændre dette."
@@ -90,5 +90,49 @@ export async function saveZone(raw: unknown): Promise<ActionResult> {
     })
   }
   refreshCatalogue()
+  return { ok: true }
+}
+
+/** Fast rabat i procent for én kunde. 0 % fjerner rabatten. */
+export async function saveCustomerDiscount(raw: unknown): Promise<ActionResult> {
+  try { await requireAdmin() } catch { return { ok: false, error: FORBIDDEN } }
+  let input
+  try { input = parseCustomerDiscountInput(raw) } catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Ugyldigt input" } }
+
+  const [customer] = await db.select({ id: user.id }).from(user).where(eq(user.id, input.userId)).limit(1)
+  if (!customer) return { ok: false, error: "Kunden findes ikke" }
+  if (input.percent === 0 && !input.note) {
+    await db.delete(customerDiscount).where(eq(customerDiscount.userId, input.userId))
+  } else {
+    await db.insert(customerDiscount).values({ userId: input.userId, percent: input.percent, note: input.note, updatedAt: new Date() })
+      .onConflictDoUpdate({ target: customerDiscount.userId, set: { percent: input.percent, note: input.note, updatedAt: new Date() } })
+  }
+  revalidatePath("/admin/kunder")
+  return { ok: true }
+}
+
+export async function saveDiscountCode(raw: unknown): Promise<ActionResult> {
+  try { await requireAdmin() } catch { return { ok: false, error: FORBIDDEN } }
+  let input
+  try { input = parseDiscountCodeInput(raw) } catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Ugyldigt input" } }
+
+  const values = {
+    code: input.code, kind: input.kind, value: input.value, minSubtotal: input.minSubtotal,
+    validFrom: input.validFrom, validUntil: input.validUntil, maxUses: input.maxUses, active: input.active, note: input.note,
+  }
+  try {
+    if (input.id) {
+      const updated = await db.update(discountCode).set({ ...values, updatedAt: new Date() }).where(eq(discountCode.id, input.id)).returning({ id: discountCode.id })
+      if (!updated.length) return { ok: false, error: "Rabatkoden findes ikke" }
+    } else {
+      await db.insert(discountCode).values({ id: `code-${randomUUID().slice(0, 8)}`, ...values })
+    }
+  } catch (error) {
+    if (errorCode(error) === "23505") return { ok: false, error: "Der findes allerede en rabatkode med det navn." }
+    // 23514 = check_violation, fx et loft under det antal gange, koden allerede er brugt.
+    if (errorCode(error) === "23514") return { ok: false, error: "Værdierne er ikke gyldige. Tjek procent, datoer og maks antal brug." }
+    throw error
+  }
+  revalidatePath("/admin/rabatkoder")
   return { ok: true }
 }

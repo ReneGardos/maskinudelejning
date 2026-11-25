@@ -64,6 +64,7 @@ export const booking = pgTable("booking", {
   deposit: integer("deposit").notNull().default(0),
   status: text("status").notNull().default("pending"),
   total: integer("total").notNull().default(0),
+  orderId: text("orderId"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 })
@@ -76,4 +77,51 @@ export const bookingItem = pgTable("booking_item", {
   quantity: integer("quantity").notNull(),
   unitPrice: integer("unitPrice").notNull(),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
+})
+
+export const bookingOrder = pgTable("booking_order", {
+  id: text("id").primaryKey(),
+  orderNumber: integer("orderNumber").generatedByDefaultAsIdentity({ startWith: 1001 }),
+  userId: text("userId").notNull(),
+  customerName: text("customerName").notNull(),
+  customerEmail: text("customerEmail").notNull(),
+  customerPhone: text("customerPhone").notNull(),
+  company: text("company"),
+  notes: text("notes"),
+  deliveryType: text("deliveryType").notNull().default("collection"),
+  deliveryAddress: text("deliveryAddress"),
+  deliveryPostalCode: text("deliveryPostalCode"),
+  deliveryFee: integer("deliveryFee").notNull().default(0),
+  subtotal: integer("subtotal").notNull().default(0),
+  discountAmount: integer("discountAmount").notNull().default(0),
+  discountLabel: text("discountLabel"),
+  discountCodeId: text("discountCodeId"),
+  total: integer("total").notNull().default(0),
+  deposit: integer("deposit").notNull().default(0),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+})
+
+export const customerDiscount = pgTable("customer_discount", {
+  userId: text("userId").primaryKey(),
+  percent: integer("percent").notNull().default(0),
+  note: text("note"),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+})
+
+export const discountCode = pgTable("discount_code", {
+  id: text("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  kind: text("kind").notNull(),
+  value: integer("value").notNull(),
+  minSubtotal: integer("minSubtotal").notNull().default(0),
+  validFrom: date("validFrom"),
+  validUntil: date("validUntil"),
+  maxUses: integer("maxUses"),
+  usedCount: integer("usedCount").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  note: text("note"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 })

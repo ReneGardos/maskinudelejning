@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { cancelMyBooking } from "@/app/actions/bookings"
+import { cancelMyOrder } from "@/app/actions/bookings"
 
 export function CancelBookingButton({ id }: { id: string }) {
   const router = useRouter()
@@ -10,10 +10,10 @@ export function CancelBookingButton({ id }: { id: string }) {
   const [error, setError] = useState("")
 
   async function cancel() {
-    if (!window.confirm("Er du sikker på, at du vil annullere denne booking?")) return
+    if (!window.confirm("Er du sikker på, at du vil annullere hele denne booking?")) return
     setPending(true); setError("")
     try {
-      const result = await cancelMyBooking(id)
+      const result = await cancelMyOrder(id)
       if (result.ok) router.refresh()
       else if (result.unauthorized) router.push("/sign-in")
       else setError(result.error)

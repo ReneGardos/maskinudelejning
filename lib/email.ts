@@ -1,21 +1,23 @@
 // Mails sendes via Resend's HTTP-API (ingen ekstra pakker nødvendige).
 // Sæt RESEND_API_KEY og MAIL_FROM for at slå mails til. Uden dem logges mailen blot (uden indhold), og siden virker som normalt.
 
-export type BookingMail = {
-  machineName: string
-  startDate: string
-  endDate: string
-  total: number
-  deliveryFee: number
-  deposit: number
+export type OrderMail = {
+  orderNumber: number | null
   customerName: string
   customerEmail: string
   customerPhone: string
+  company: string | null
   notes: string | null
   deliveryType: string
   deliveryAddress: string | null
   deliveryPostalCode: string | null
-  items?: Array<{ name: string; quantity: number }>
+  deliveryFee: number
+  subtotal: number
+  discountAmount: number
+  discountLabel: string | null
+  total: number
+  deposit: number
+  lines: Array<{ machineName: string; startDate: string; endDate: string; items: Array<{ name: string; quantity: number }> }>
 }
 
 export function escapeHtml(value: string) {
@@ -37,19 +39,27 @@ function formatDate(value: string) {
 
 const kr = (amount: number) => `${amount.toLocaleString("da-DK")} kr.`
 
-function deliveryLine(b: BookingMail) {
+const orderNo = (b: OrderMail) => b.orderNumber ? `MU-${b.orderNumber}` : ""
+
+function deliveryLine(b: OrderMail) {
   if (b.deliveryType !== "delivery") return "Afhentning hos os"
   const fee = b.deliveryFee > 0 ? ` (${kr(b.deliveryFee)})` : ""
   return `Levering til ${b.deliveryAddress}, ${b.deliveryPostalCode}${fee}`
 }
 
-function layout(title: string, lead: string, b: BookingMail, extra = "") {
+function layout(title: string, lead: string, b: OrderMail, extra = "") {
   const row = (label: string, value: string) => `<tr><td style="padding:6px 16px 6px 0;color:#666;vertical-align:top">${label}</td><td style="padding:6px 0"><strong>${escapeHtml(value)}</strong></td></tr>`
-  const accessories = b.items?.length ? row("Tilbehør", b.items.map((item) => `${item.quantity} × ${item.name}`).join(", ")) : ""
-  const deposit = b.deposit > 0 ? row("Depositum", `${kr(b.deposit)} (refunderes ved afleveret i orden)`) : ""
+  const machines = b.lines.map((line) => {
+    const items = line.items.length ? `<br><span style="color:#666">+ ${escapeHtml(line.items.map((item) => `${item.quantity} × ${item.name}`).join(", "))}</span>` : ""
+    return `<li style="margin:0 0 8px"><strong>${escapeHtml(line.machineName)}</strong>, ${formatDate(line.startDate)} – ${formatDate(line.endDate)}${items}</li>`
+  }).join("")
+  const discount = b.discountAmount > 0 ? row("Rabat", `−${kr(b.discountAmount)}${b.discountLabel ? ` (${b.discountLabel})` : ""}`) : ""
+  const deposit = b.deposit > 0 ? row("Depositum", `${kr(b.deposit)} (refunderes, når materiellet er afleveret i orden)`) : ""
+  const company = b.company ? row("Firma", b.company) : ""
   return `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#171a1b">
 <h2 style="margin:0 0 12px">${escapeHtml(title)}</h2><p>${lead}</p>
-<table style="border-collapse:collapse;margin:16px 0">${row("Maskine", b.machineName)}${row("Periode", `${formatDate(b.startDate)} – ${formatDate(b.endDate)}`)}${accessories}${row("Levering", deliveryLine(b))}${row("Pris i alt", `${kr(b.total)} ekskl. moms`)}${deposit}</table>${extra}
+<ul style="padding-left:18px;margin:16px 0">${machines}</ul>
+<table style="border-collapse:collapse;margin:16px 0">${row("Booking", orderNo(b))}${company}${row("Levering", deliveryLine(b))}${row("Leje", kr(b.subtotal))}${discount}${row("Pris i alt", `${kr(b.total)} ekskl. moms`)}${deposit}</table>${extra}
 <p style="color:#666;font-size:13px">Se og administrer dine bookinger under <a href="${siteUrl()}/min-konto">Min konto</a>.</p></div>`
 }
 
@@ -74,23 +84,23 @@ export async function sendEmail(to: string, subject: string, html: string) {
   }
 }
 
-/** Kunden har sendt en forespørgsel: kvittering til kunden og besked til udlejer. */
-export async function sendBookingReceived(b: BookingMail) {
-  await sendEmail(b.customerEmail, "Vi har modtaget din bookingforespørgsel", layout("Tak for din forespørgsel", `Hej ${escapeHtml(b.customerName)}, vi har modtaget din forespørgsel og vender tilbage med en endelig bekræftelse.`, b))
+/** Kunden har sendt en booking: kvittering til kunden og besked til udlejer. */
+export async function sendOrderReceived(b: OrderMail) {
+  await sendEmail(b.customerEmail, `Vi har modtaget din booking ${orderNo(b)}`, layout("Tak for din booking", `Hej ${escapeHtml(b.customerName)}, vi har modtaget din booking og vender tilbage med en endelig bekræftelse.`, b))
   const notes = b.notes ? `<p><strong>Besked:</strong> ${escapeHtml(b.notes)}</p>` : ""
-  await sendEmail(adminRecipient(), `Ny booking: ${b.machineName}`, layout("Ny bookingforespørgsel", `${escapeHtml(b.customerName)} (${escapeHtml(b.customerEmail)}, ${escapeHtml(b.customerPhone)}) har sendt en forespørgsel. <a href="${siteUrl()}/admin">Åbn administration</a>.`, b, notes))
+  await sendEmail(adminRecipient(), `Ny booking ${orderNo(b)}: ${b.customerName}`, layout("Ny booking", `${escapeHtml(b.customerName)} (${escapeHtml(b.customerEmail)}, ${escapeHtml(b.customerPhone)}) har sendt en booking. <a href="${siteUrl()}/admin">Åbn administration</a>.`, b, notes))
 }
 
 /** Admin har bekræftet eller annulleret: besked til kunden. */
-export async function sendStatusChanged(b: BookingMail, status: "confirmed" | "cancelled") {
-  if (status === "confirmed") await sendEmail(b.customerEmail, "Din booking er bekræftet", layout("Din booking er bekræftet", `Hej ${escapeHtml(b.customerName)}, din booking er bekræftet.`, b))
-  else await sendEmail(b.customerEmail, "Din booking er annulleret", layout("Din booking er annulleret", `Hej ${escapeHtml(b.customerName)}, din booking er desværre blevet annulleret. Kontakt os, hvis du har spørgsmål.`, b))
+export async function sendOrderStatusChanged(b: OrderMail, status: "confirmed" | "cancelled") {
+  if (status === "confirmed") await sendEmail(b.customerEmail, `Din booking ${orderNo(b)} er bekræftet`, layout("Din booking er bekræftet", `Hej ${escapeHtml(b.customerName)}, din booking er bekræftet.`, b))
+  else await sendEmail(b.customerEmail, `Din booking ${orderNo(b)} er annulleret`, layout("Din booking er annulleret", `Hej ${escapeHtml(b.customerName)}, din booking er desværre blevet annulleret. Kontakt os, hvis du har spørgsmål.`, b))
 }
 
 /** Kunden har selv annulleret: kvittering til kunden og besked til udlejer. */
-export async function sendCancelledByCustomer(b: BookingMail) {
-  await sendEmail(b.customerEmail, "Din booking er annulleret", layout("Din booking er annulleret", `Hej ${escapeHtml(b.customerName)}, vi har annulleret din booking som ønsket.`, b))
-  await sendEmail(adminRecipient(), `Booking annulleret af kunde: ${b.machineName}`, layout("Kunden har annulleret", `${escapeHtml(b.customerName)} har selv annulleret sin booking.`, b))
+export async function sendOrderCancelledByCustomer(b: OrderMail) {
+  await sendEmail(b.customerEmail, `Din booking ${orderNo(b)} er annulleret`, layout("Din booking er annulleret", `Hej ${escapeHtml(b.customerName)}, vi har annulleret din booking som ønsket.`, b))
+  await sendEmail(adminRecipient(), `Booking ${orderNo(b)} annulleret af kunde`, layout("Kunden har annulleret", `${escapeHtml(b.customerName)} har selv annulleret sin booking.`, b))
 }
 
 /** Link til at vælge en ny adgangskode. Linket udløber efter en time. */
