@@ -97,10 +97,12 @@ export async function createOrder(raw: unknown): Promise<ActionResult<{ orderNum
   const accessoryRows = accessoryIds.length ? await db.select().from(accessory).where(and(inArray(accessory.id, accessoryIds), eq(accessory.active, true))) : []
   const accessoryById = new Map(accessoryRows.map((row) => [row.id, row]))
 
-  const lines = []
+  type Chosen = { row: typeof accessory.$inferSelect; quantity: number }
+  type PricedLine = (typeof input.lines)[number] & { machine: typeof machine.$inferSelect; chosen: Chosen[]; days: number }
+  const lines: PricedLine[] = []
   for (const [index, line] of input.lines.entries()) {
     const selected = bySlug.get(line.machineSlug)!
-    const chosen = []
+    const chosen: Chosen[] = []
     for (const item of line.accessories) {
       const row = accessoryById.get(item.id)
       if (!row || row.machineId !== selected.id) return { ok: false, error: `Noget af tilbehøret til ${selected.name} findes ikke længere. Opdater siden og prøv igen.` }
