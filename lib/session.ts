@@ -1,4 +1,5 @@
 import { headers } from "next/headers"
+import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 
 export type SessionUser = { id: string; name: string; email: string; role: "user" | "admin" }
@@ -19,5 +20,13 @@ export async function requireUser(): Promise<SessionUser> {
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await requireUser()
   if (user.role !== "admin") throw new Error("Forbidden")
+  return user
+}
+
+/** Til admin-sider: send til login, hvis man ikke er logget ind, og til Min konto, hvis man ikke er admin. */
+export async function requireAdminPage(): Promise<SessionUser> {
+  const user = await getSessionUser()
+  if (!user) redirect("/sign-in")
+  if (user.role !== "admin") redirect("/min-konto")
   return user
 }

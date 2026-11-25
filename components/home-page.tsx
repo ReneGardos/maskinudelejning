@@ -1,0 +1,57 @@
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { company } from '@/lib/company'
+import { LegalLinks } from '@/components/legal-links'
+import { ArrowRight, CalendarDays, ChevronDown, CircleCheck, Clock3, Filter, Menu, PackageCheck, Search, ShieldCheck, Truck, UserRound, X } from 'lucide-react'
+
+export type HomeMachine = { slug: string; name: string; type: string; price: number; image: string; specs: string }
+
+const categories = ['Minigravere', 'Pladevibratorer', 'Beton & blanding', 'Nedbrydningshamre', 'Motorbøre', 'Have & anlæg']
+const projects = ['Grave ud til terrasse', 'Komprimere jord og grus', 'Nedbryde beton', 'Flytte jord']
+
+export default function HomePage({ machines }: { machines: HomeMachine[] }) {
+  const router = useRouter()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [project, setProject] = useState('')
+  const [search, setSearch] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [postcode, setPostcode] = useState('7400')
+  const [filterOpen, setFilterOpen] = useState(false)
+
+  // Sender datoer og søgeord videre til kataloget, som viser de maskiner, der faktisk er ledige.
+  function findMachines() {
+    const params = new URLSearchParams()
+    if (search.trim()) params.set('q', search.trim())
+    if (startDate && endDate && endDate >= startDate) { params.set('start', startDate); params.set('end', endDate) }
+    const query = params.toString()
+    router.push(query ? `/maskiner?${query}` : '/maskiner')
+  }
+
+  return (
+    <main className="site-shell">
+      <div className="topbar"><div className="container topbar-inner"><span><Clock3 size={14} /> Man–fre 07:00–16:00</span><span className="topbar-muted">Levering i hele Midtjylland · Afhentning i Herning</span><Link href="#kontakt">Har du brug for hjælp? <ArrowRight size={13} /></Link></div></div>
+      <header className="navbar"><div className="container nav-inner"><Link href="/" className="brand"><span className="brand-mark">M</span><span>maskin<span>udlejning</span><small>MASKINER TIL DINE PROJEKTER</small></span></Link><nav className={menuOpen ? 'nav-links open' : 'nav-links'}><Link href="#maskiner">Maskiner</Link><Link href="#projekter">Find din maskine</Link><Link href="#saadan">Sådan fungerer det</Link><Link href="#om-os">Om os</Link></nav><div className="nav-actions"><Link href="/min-konto" className="account-link"><UserRound size={18} /> Min konto</Link><Link href="#booking" className="button button-dark">Book en maskine <ArrowRight size={16} /></Link></div><button className="mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Åbn menu">{menuOpen ? <X /> : <Menu />}</button></div></header>
+
+      <section className="hero"><div className="hero-image" /><div className="hero-overlay" /><div className="container hero-content"><div className="eyebrow light"><span className="eyebrow-line" /> MASKINUDLEJNING I MIDTJYLLAND</div><h1>Lej den rigtige maskine.<br /><em>Kom hurtigere i mål.</em></h1><p>Professionelt materiel, enkel booking og levering lige til døren. Til både private projekter og professionelle opgaver.</p><div className="trust-row"><span><CircleCheck size={16} /> Klar pris fra start</span><span><CircleCheck size={16} /> Fleksibel afhentning</span><span><CircleCheck size={16} /> Lokalt team</span></div></div><div className="hero-number">01 <span>/ 03</span></div></section>
+
+      <section className="booking-wrap" id="booking"><div className="container"><div className="booking-card"><div className="booking-heading"><span className="step-number">01</span><div><p className="eyebrow">HURTIG BOOKING</p><h2>Hvad skal du bruge?</h2></div></div><div className="booking-fields"><label className="search-field"><span>Maskine eller opgave</span><div><Search size={18} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Fx pladevibrator eller terrasse" /></div></label><label><span>Startdato</span><div className="input-like"><CalendarDays size={18} /><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} aria-label="Startdato" /></div></label><label><span>Slutdato</span><div className="input-like"><CalendarDays size={18} /><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} aria-label="Slutdato" /></div></label><label><span>Postnummer</span><div className="input-like"><span className="pin">⌖</span><input value={postcode} onChange={(e) => setPostcode(e.target.value)} inputMode="numeric" placeholder="7400" aria-label="Postnummer" /></div></label><button className="button button-orange" onClick={findMachines}>Find ledige maskiner <ArrowRight size={17} /></button></div></div></div></section>
+
+      <section className="section categories"><div className="container"><div className="section-head"><div><p className="eyebrow">ALT TIL DIT PROJEKT</p><h2>Find det rigtige materiel</h2></div><Link href="/maskiner" className="text-link">Se alle maskiner <ArrowRight size={16} /></Link></div><div className="category-grid">{categories.map((cat, i) => <Link href="/maskiner" className="category-card" key={cat}><div className={`category-visual visual-${i + 1}`}><span>0{i + 1}</span></div><div className="category-name">{cat}<ArrowRight size={17} /></div></Link>)}</div></div></section>
+
+      <section className="section project-finder" id="projekter"><div className="container finder-grid"><div><p className="eyebrow orange">PROJEKTFINDER</p><h2>Hvad skal du have lavet?</h2><p className="muted large">Du behøver ikke kende maskinens navn. Fortæl os om dit projekt, så hjælper vi dig med at finde det rigtige udstyr.</p><div className="project-options">{projects.map((item, i) => <button className={project === item ? 'project-option selected' : 'project-option'} key={item} onClick={() => setProject(item)}><span>0{i + 1}</span>{item}<ArrowRight size={16} /></button>)}</div><Link href="/maskiner" className="button button-dark">Se anbefalinger <ArrowRight size={17} /></Link></div><div className="finder-art"><div className="art-label"><PackageCheck size={18} /><span>Smart match</span><strong>{project || 'Vælg dit projekt'}</strong></div></div></div></section>
+
+      <section className="section machines" id="maskiner"><div className="container"><div className="section-head"><div><p className="eyebrow">KLAR TIL LEJE</p><h2>Populære maskiner</h2></div><div className="catalogue-actions"><button onClick={() => setFilterOpen(!filterOpen)} aria-expanded={filterOpen}><Filter size={15} /> Filtrer</button>{filterOpen && <div className="filter-popover"><strong>Filtrer maskiner</strong><label><input type="checkbox" defaultChecked /> Ledige nu</label><label><input type="checkbox" /> Levering mulig</label><label><input type="checkbox" /> Under 500 kr./dag</label></div>}<Link href="/maskiner" className="text-link">Se kataloget <ArrowRight size={16} /></Link></div></div><div className="machine-grid">{machines.map((machine) => <article className="machine-card" key={machine.slug}><div className="machine-image"><img src={machine.image} alt={machine.name} /></div><div className="machine-body"><p className="machine-type">{machine.type}</p><h3>{machine.name}</h3><p className="specs">{machine.specs}</p><div className="machine-bottom"><div><strong>{machine.price.toLocaleString('da-DK')} kr.</strong><span>/ dag ekskl. moms</span></div><Link href={`/maskiner/${machine.slug}`} className="round-arrow" aria-label={`Se ${machine.name}`}><ArrowRight size={18} /></Link></div></div></article>)}</div></div></section>
+
+      <section className="dark-section" id="saadan"><div className="container"><div className="section-head light-head"><div><p className="eyebrow orange">NEMT FRA START TIL SLUT</p><h2>Sådan fungerer det</h2></div><p className="dark-intro">Vi har gjort det enkelt at leje professionelt materiel.</p></div><div className="steps-grid"><div className="step"><span>01</span><Search size={24} /><h3>Find din maskine</h3><p>Søg på maskine eller fortæl os, hvad du skal i gang med.</p></div><div className="step"><span>02</span><CalendarDays size={24} /><h3>Vælg dato og book</h3><p>Se ledighed med det samme og få en pris uden overraskelser.</p></div><div className="step"><span>03</span><Truck size={24} /><h3>Hent eller få leveret</h3><p>Vi gør maskinen klar. Du kommer hurtigt videre med dit projekt.</p></div></div></div></section>
+
+      <section className="section reassurance" id="om-os"><div className="container reassurance-grid"><div className="reassurance-copy"><p className="eyebrow orange">DET LOKALE VALG</p><h2>Ordentligt materiel.<br /><em>Ordentlig service.</em></h2><p className="muted large">Vi tror på, at maskinudlejning skal være lige til. Derfor får du altid gennemgået maskinen, klare priser og et lokalt team, der tager telefonen.</p><div className="reassurance-list"><div><ShieldCheck size={22} /><span><strong>Kontrolleret materiel</strong><small>Alle maskiner tjekkes før udlejning.</small></span></div><div><Truck size={22} /><span><strong>Levering når det passer dig</strong><small>Vi leverer i hele området efter aftale.</small></span></div></div></div><div className="quote-card"><div className="quote-mark">“</div><p>Det skal være nemt at komme videre. Vi hjælper dig med både den første maskine og den næste.</p><div className="quote-author"><span><strong>{company.name}</strong><small>Lokalt team i Herning</small></span></div></div></div></div></section>
+
+      <section className="final-cta"><div className="container final-cta-inner"><div><p className="eyebrow orange">KLAR TIL AT KOMME VIDERE?</p><h2>Din opgave. Vores maskiner.</h2></div><Link href="#booking" className="button button-orange">Find en maskine <ArrowRight size={17} /></Link></div></section>
+      <footer id="kontakt"><div className="container footer-grid"><div className="footer-brand-block"><div className="footer-brand-row"><Link href="/" className="brand footer-brand"><span className="brand-mark">M</span><span>maskin<span>udlejning</span><small>MASKINER TIL DINE PROJEKTER</small></span></Link></div><p className="footer-copy">Professionelt materiel til private og erhverv i Midtjylland.</p></div><div><h4>Genveje</h4><Link href="/maskiner">Alle maskiner</Link><Link href="#projekter">Find din maskine</Link><Link href="/min-konto">Min konto</Link></div><div><h4>Kontakt</h4><span>{company.address}</span><a href={`tel:${company.phone.replace(/\s/g, '')}`}>{company.phone}</a><a href={`mailto:${company.email}`}>{company.email}</a></div><div><h4>Åbningstider</h4>{company.hours.map((line) => <span key={line}>{line}</span>)}</div></div><div className="container footer-bottom"><span>© {new Date().getFullYear()} {company.name}. Alle rettigheder forbeholdes.</span><LegalLinks /></div></footer>
+    </main>
+  )
+}

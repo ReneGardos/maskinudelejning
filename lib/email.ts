@@ -1,11 +1,13 @@
 // Mails sendes via Resend's HTTP-API (ingen ekstra pakker nødvendige).
-// Sæt RESEND_API_KEY og MAIL_FROM for at slå mails til. Uden dem logges mailen blot, og booking virker som normalt.
+// Sæt RESEND_API_KEY og MAIL_FROM for at slå mails til. Uden dem logges mailen blot (uden indhold), og siden virker som normalt.
 
-type BookingMail = {
+export type BookingMail = {
   machineName: string
   startDate: string
   endDate: string
   total: number
+  deliveryFee: number
+  deposit: number
   customerName: string
   customerEmail: string
   customerPhone: string
@@ -13,13 +15,14 @@ type BookingMail = {
   deliveryType: string
   deliveryAddress: string | null
   deliveryPostalCode: string | null
+  items?: Array<{ name: string; quantity: number }>
 }
 
 export function escapeHtml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
 }
 
-function siteUrl() {
+export function siteUrl() {
   return (process.env.BETTER_AUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")).replace(/\/$/, "")
 }
 
@@ -32,15 +35,21 @@ function formatDate(value: string) {
   return `${d}.${m}.${y}`
 }
 
+const kr = (amount: number) => `${amount.toLocaleString("da-DK")} kr.`
+
 function deliveryLine(b: BookingMail) {
-  return b.deliveryType === "delivery" ? `Levering til ${b.deliveryAddress}, ${b.deliveryPostalCode} (pris aftales)` : "Afhentning hos os"
+  if (b.deliveryType !== "delivery") return "Afhentning hos os"
+  const fee = b.deliveryFee > 0 ? ` (${kr(b.deliveryFee)})` : ""
+  return `Levering til ${b.deliveryAddress}, ${b.deliveryPostalCode}${fee}`
 }
 
 function layout(title: string, lead: string, b: BookingMail, extra = "") {
-  const row = (label: string, value: string) => `<tr><td style="padding:6px 16px 6px 0;color:#666">${label}</td><td style="padding:6px 0"><strong>${escapeHtml(value)}</strong></td></tr>`
+  const row = (label: string, value: string) => `<tr><td style="padding:6px 16px 6px 0;color:#666;vertical-align:top">${label}</td><td style="padding:6px 0"><strong>${escapeHtml(value)}</strong></td></tr>`
+  const accessories = b.items?.length ? row("Tilbehør", b.items.map((item) => `${item.quantity} × ${item.name}`).join(", ")) : ""
+  const deposit = b.deposit > 0 ? row("Depositum", `${kr(b.deposit)} (refunderes ved afleveret i orden)`) : ""
   return `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#171a1b">
 <h2 style="margin:0 0 12px">${escapeHtml(title)}</h2><p>${lead}</p>
-<table style="border-collapse:collapse;margin:16px 0">${row("Maskine", b.machineName)}${row("Periode", `${formatDate(b.startDate)} – ${formatDate(b.endDate)}`)}${row("Pris", `${b.total.toLocaleString("da-DK")} kr. ekskl. moms`)}${row("Levering", deliveryLine(b))}</table>${extra}
+<table style="border-collapse:collapse;margin:16px 0">${row("Maskine", b.machineName)}${row("Periode", `${formatDate(b.startDate)} – ${formatDate(b.endDate)}`)}${accessories}${row("Levering", deliveryLine(b))}${row("Pris i alt", `${kr(b.total)} ekskl. moms`)}${deposit}</table>${extra}
 <p style="color:#666;font-size:13px">Se og administrer dine bookinger under <a href="${siteUrl()}/min-konto">Min konto</a>.</p></div>`
 }
 
@@ -49,7 +58,7 @@ export async function sendEmail(to: string, subject: string, html: string) {
   const apiKey = process.env.RESEND_API_KEY
   const from = process.env.MAIL_FROM
   if (!apiKey || !from) {
-    console.log(`[mail ikke sendt – RESEND_API_KEY/MAIL_FROM mangler] til=${to} emne="${subject}"`)
+    console.log(`[mail ikke sendt – RESEND_API_KEY/MAIL_FROM mangler] emne="${subject}"`)
     return
   }
   try {
@@ -82,4 +91,14 @@ export async function sendStatusChanged(b: BookingMail, status: "confirmed" | "c
 export async function sendCancelledByCustomer(b: BookingMail) {
   await sendEmail(b.customerEmail, "Din booking er annulleret", layout("Din booking er annulleret", `Hej ${escapeHtml(b.customerName)}, vi har annulleret din booking som ønsket.`, b))
   await sendEmail(adminRecipient(), `Booking annulleret af kunde: ${b.machineName}`, layout("Kunden har annulleret", `${escapeHtml(b.customerName)} har selv annulleret sin booking.`, b))
+}
+
+/** Link til at vælge en ny adgangskode. Linket udløber efter en time. */
+export async function sendPasswordReset(to: string, name: string, url: string) {
+  const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#171a1b">
+<h2 style="margin:0 0 12px">Nulstil din adgangskode</h2>
+<p>Hej ${escapeHtml(name)}, vi har modtaget en anmodning om at nulstille adgangskoden til din konto.</p>
+<p><a href="${escapeHtml(url)}" style="display:inline-block;background:#171a1b;color:#fff;padding:12px 20px;border-radius:99px;text-decoration:none;font-weight:bold">Vælg ny adgangskode</a></p>
+<p style="color:#666;font-size:13px">Linket virker i én time. Har du ikke bedt om det, kan du blot ignorere denne mail. Din adgangskode ændres ikke.</p></div>`
+  await sendEmail(to, "Nulstil din adgangskode", html)
 }

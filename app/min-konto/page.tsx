@@ -5,5 +5,53 @@ import { getMyBookings } from "@/app/actions/bookings"
 import { LogoutButton } from "@/components/logout-button"
 import { CancelBookingButton } from "@/components/cancel-booking-button"
 import { canCancelBooking } from "@/lib/booking-rules"
+import { formatKr } from "@/lib/pricing"
 
-export default async function AccountPage() { const user = await getSessionUser(); if (!user) redirect("/sign-in"); const bookings = await getMyBookings(); return <main className="account-page"><header className="account-header"><Link href="/" className="brand">maskin<span>udlejning</span></Link><div><span className="muted">Hej, {user.name}</span>{user.role === "admin" && <Link href="/admin" className="text-link">Administration</Link>}<Link href="/maskiner" className="button button-dark">Find en maskine</Link><LogoutButton /></div></header><section className="account-shell"><p className="eyebrow">Min konto</p><h1>Dine bookinger</h1><p className="lead">Her finder du status på dine maskiner og tidligere forespørgsler.</p>{bookings.length === 0 ? <div className="empty-state"><h2>Ingen bookinger endnu</h2><p className="muted">Find en maskine, og send din første forespørgsel.</p><Link href="/maskiner" className="button button-dark">Se maskiner</Link></div> : <div className="booking-list">{bookings.map((item) => <article className="booking-row" key={item.id}><div><p className="eyebrow">{item.machineName}</p><h2>{item.startDate} → {item.endDate}</h2><p className="muted">{item.total.toLocaleString("da-DK")} kr. ekskl. moms · {item.deliveryType === "delivery" ? `Levering til ${item.deliveryAddress}, ${item.deliveryPostalCode} (pris aftales)` : "Afhentning hos os"}</p><p className="muted">Sendt {item.createdAt.toLocaleDateString("da-DK")}</p></div><div><span className={`status status-${item.status}`}>{item.status === "pending" ? "Afventer" : item.status === "confirmed" ? "Bekræftet" : "Annulleret"}</span>{canCancelBooking(item.startDate, item.status) && <CancelBookingButton id={item.id} />}</div></article>)}</div>}</section></main> }
+const statusLabel = (status: string) => status === "pending" ? "Afventer" : status === "confirmed" ? "Bekræftet" : "Annulleret"
+
+export default async function AccountPage() {
+  const user = await getSessionUser()
+  if (!user) redirect("/sign-in")
+  const bookings = await getMyBookings()
+  return (
+    <main className="account-page">
+      <header className="account-header">
+        <Link href="/" className="brand">maskin<span>udlejning</span></Link>
+        <div>
+          <span className="muted">Hej, {user.name}</span>
+          {user.role === "admin" && <Link href="/admin" className="text-link">Administration</Link>}
+          <Link href="/min-konto/profil" className="text-link">Profil</Link>
+          <Link href="/maskiner" className="button button-dark">Find en maskine</Link>
+          <LogoutButton />
+        </div>
+      </header>
+      <section className="account-shell">
+        <p className="eyebrow">Min konto</p>
+        <h1>Dine bookinger</h1>
+        <p className="lead">Her finder du status på dine maskiner og tidligere forespørgsler.</p>
+        {bookings.length === 0 ? (
+          <div className="empty-state"><h2>Ingen bookinger endnu</h2><p className="muted">Find en maskine, og send din første forespørgsel.</p><Link href="/maskiner" className="button button-dark">Se maskiner</Link></div>
+        ) : (
+          <div className="booking-list">
+            {bookings.map((item) => (
+              <article className="booking-row" key={item.id}>
+                <div>
+                  <p className="eyebrow">{item.machineName}</p>
+                  <h2>{item.startDate} → {item.endDate}</h2>
+                  {item.items.length > 0 && <p className="muted">Tilbehør: {item.items.map((row) => `${row.quantity} × ${row.name}`).join(", ")}</p>}
+                  <p className="muted">{formatKr(item.total)} ekskl. moms{item.deposit > 0 ? ` · depositum ${formatKr(item.deposit)} opkræves separat` : ""}</p>
+                  <p className="muted">{item.deliveryType === "delivery" ? `Levering til ${item.deliveryAddress}, ${item.deliveryPostalCode}${item.deliveryFee > 0 ? ` (leveringsgebyr ${formatKr(item.deliveryFee)} er med i prisen)` : ""}` : "Afhentning hos os"}</p>
+                  <p className="muted">Sendt {item.createdAt.toLocaleDateString("da-DK")}</p>
+                </div>
+                <div>
+                  <span className={`status status-${item.status}`}>{statusLabel(item.status)}</span>
+                  {canCancelBooking(item.startDate, item.status) && <CancelBookingButton id={item.id} />}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </main>
+  )
+}

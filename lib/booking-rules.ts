@@ -48,6 +48,25 @@ export type BookingInput = {
   deliveryType: DeliveryType
   deliveryAddress: string | null
   deliveryPostalCode: string | null
+  accessories: Array<{ id: string; quantity: number }>
+}
+
+export const MAX_ACCESSORY_QUANTITY = 10
+
+/** Rensér tilbehørslisten: kun gyldige id'er og antal, og samme tilbehør lægges sammen. */
+function parseAccessories(value: unknown): Array<{ id: string; quantity: number }> {
+  if (value === undefined || value === null) return []
+  if (!Array.isArray(value) || value.length > 20) throw new Error("Ugyldigt tilbehør")
+  const merged = new Map<string, number>()
+  for (const entry of value) {
+    const item = entry as { id?: unknown; quantity?: unknown } | null
+    if (!item || typeof item.id !== "string" || !item.id || item.id.length > 100) throw new Error("Ugyldigt tilbehør")
+    const quantity = Number(item.quantity)
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_ACCESSORY_QUANTITY) throw new Error("Ugyldigt antal tilbehør")
+    merged.set(item.id, (merged.get(item.id) ?? 0) + quantity)
+  }
+  for (const quantity of merged.values()) if (quantity > MAX_ACCESSORY_QUANTITY) throw new Error("Ugyldigt antal tilbehør")
+  return Array.from(merged, ([id, quantity]) => ({ id, quantity }))
 }
 
 /** Rensér og valider input fra klienten. Kaster en dansk fejlbesked ved ugyldigt input. */
@@ -66,6 +85,9 @@ export function parseBookingInput(raw: unknown): BookingInput {
   const deliveryType = text("deliveryType") || "collection"
   const deliveryAddress = text("deliveryAddress")
   const deliveryPostalCode = text("deliveryPostalCode")
+
+  if (input.acceptTerms !== true) throw new Error("Du skal acceptere handelsbetingelserne for at sende en forespørgsel")
+  const accessories = parseAccessories(input.accessories)
 
   if (!(DELIVERY_TYPES as readonly string[]).includes(deliveryType)) throw new Error("Vælg levering eller afhentning")
   if (deliveryType === "delivery") {
@@ -89,5 +111,6 @@ export function parseBookingInput(raw: unknown): BookingInput {
     deliveryType: deliveryType as DeliveryType,
     deliveryAddress: delivery ? deliveryAddress : null,
     deliveryPostalCode: delivery ? deliveryPostalCode : null,
+    accessories,
   }
 }
