@@ -22,7 +22,7 @@ export function MachineCatalogue({ machines, period, today, initialQuery }: { ma
     <div className="catalogue-layout">
       <aside className="filters">
         <div className="filter-title"><strong>Filtrer maskiner</strong><SlidersHorizontal size={17}/></div>
-        <label>Søg efter maskine<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Fx minigraver" /></label>
+        <label>Søg efter maskine<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Fx pladevibrator" /></label>
         <label>Kategori<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select></label>
         <form className="filter-box" method="get" action="/maskiner" key={`${period?.start}-${period?.end}`}>
           <strong>Ledig i periode</strong>

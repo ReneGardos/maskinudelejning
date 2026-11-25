@@ -1,5 +1,8 @@
 import Link from "next/link"
+import { noIndex } from "@/lib/site"
 import { AuthForm } from "@/components/auth-form"
+
+export const metadata = { title: "Log ind", ...noIndex }
 
 export default async function SignInPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams

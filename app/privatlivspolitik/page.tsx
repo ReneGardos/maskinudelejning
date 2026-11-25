@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { company } from "@/lib/company"
 
-export const metadata = { title: "Privatlivspolitik" }
+export const metadata = { title: "Privatlivspolitik", description: "Sådan behandler vi dine personoplysninger, når du opretter en konto og booker maskiner.", alternates: { canonical: "/privatlivspolitik" } }
 
 export default function PrivacyPage() {
   return (

@@ -7,6 +7,15 @@ import { MachineCatalogue } from "@/components/machine-catalogue"
 import { getBusyMachineSlugs } from "@/lib/availability"
 import { isValidDateString, todayInDenmark } from "@/lib/booking-rules"
 
+import type { Metadata } from "next"
+import { SITE_AREA } from "@/lib/site"
+
+export const metadata: Metadata = {
+  title: `Maskiner til leje i ${SITE_AREA}`,
+  description: `Se alle maskiner til leje: pladevibrator, betonblander, brydehammer og flamingoskærer. Tjek ledighed for din periode og book online i ${SITE_AREA}.`,
+  alternates: { canonical: "/maskiner" },
+}
+
 type SearchParams = Promise<{ start?: string; end?: string; q?: string }>
 
 export default async function MachinesPage({ searchParams }: { searchParams: SearchParams }) {

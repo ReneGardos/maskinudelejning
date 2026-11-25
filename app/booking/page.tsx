@@ -6,9 +6,10 @@ import { accessory, booking, bookingOrder, customerDiscount, deliveryZone, machi
 import { getSessionUser } from "@/lib/session"
 import { isValidDateString, todayInDenmark } from "@/lib/booking-rules"
 import { OrderForm } from "@/components/order-form"
+import { noIndex } from "@/lib/site"
 
 export const dynamic = "force-dynamic"
-export const metadata = { title: "Ny booking" }
+export const metadata = { title: "Ny booking", ...noIndex }
 
 type Props = { searchParams: Promise<{ maskine?: string; start?: string; end?: string }> }
 

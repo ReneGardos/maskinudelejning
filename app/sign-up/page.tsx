@@ -1,5 +1,8 @@
 import Link from "next/link"
+import { noIndex } from "@/lib/site"
 import { AuthForm } from "@/components/auth-form"
+
+export const metadata = { title: "Opret konto", ...noIndex }
 
 export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams

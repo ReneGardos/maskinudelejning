@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { company } from "@/lib/company"
 
-export const metadata = { title: "Handelsbetingelser" }
+export const metadata = { title: "Handelsbetingelser", description: "Handelsbetingelser for leje af maskiner: booking, priser, depositum, levering, afbestilling og ansvar.", alternates: { canonical: "/handelsbetingelser" } }
 
 export default function TermsPage() {
   return (
